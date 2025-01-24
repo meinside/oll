@@ -73,16 +73,26 @@ func run(parser *flags.Parser, p params) (exitCode int, err error) {
 	}
 
 	if p.hasPrompt() { // if prompt is given,
-		logVerbose(verboseMaximum, p.Verbose, "request params with prompt: %s\n\n", prettify(p))
+		if p.GenerateEmbeddings {
+			logVerbose(verboseMaximum, p.Verbose, "embeddings request params with prompt: %s\n\n", prettify(p))
 
-		return doGeneration(context.TODO(), conf, p)
-	} else { // if prompt is not given
-		logVerbose(verboseMaximum, p.Verbose, "request params without prompt: %s\n\n", prettify(p))
+			return doEmbeddings(context.TODO(), conf, p)
+		} else {
+			logVerbose(verboseMaximum, p.Verbose, "generation request params with prompt: %s\n\n", prettify(p))
+
+			return doGeneration(context.TODO(), conf, p)
+		}
+	} else if p.ListModels {
+		return doListModels(context.TODO(), conf, p)
+	} else { // otherwise,
+		logVerbose(verboseMaximum, p.Verbose, "falling back with params: %s\n\n", prettify(p))
 
 		logMessage(verboseMedium, "Parameter error: no task was requested or handled properly.")
 
 		return printHelpBeforeExit(1, parser), nil
 	}
+
+	// should not reach here
 }
 
 // generate a default system instruction with given params

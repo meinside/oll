@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/ollama/ollama/api"
+
+	"github.com/dustin/go-humanize"
 )
 
 const (
@@ -25,6 +27,16 @@ const (
 	defaultGenerationTopK        = int32(20)
 )
 
+// return a newly created ollama api client
+func newClient() (*api.Client, error) {
+	client, err := api.ClientFromEnvironment()
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
 // generate text with given things
 func doGeneration(ctx context.Context, conf config, p params) (exit int, e error) {
 	vbs := p.Verbose
@@ -35,9 +47,9 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 	defer cancel()
 
 	// ollama api client
-	client, err := api.ClientFromEnvironment()
+	client, err := newClient()
 	if err != nil {
-		return 1, err
+		return 1, fmt.Errorf("failed to initialize Ollama API client: %w", err)
 	}
 
 	prompt := *p.Prompt
@@ -152,4 +164,76 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 	res := <-ch
 
 	return res.exit, res.err
+}
+
+// list models
+func doListModels(ctx context.Context, conf config, p params) (exit int, e error) {
+	vbs := p.Verbose
+
+	logVerbose(verboseMedium, vbs, "listing models...")
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(conf.TimeoutSeconds)*time.Second)
+	defer cancel()
+
+	// ollama api client
+	client, err := newClient()
+	if err != nil {
+		return 1, fmt.Errorf("failed to initialize Ollama API client: %w", err)
+	}
+
+	// list models
+	models, err := client.List(ctx)
+	if err != nil {
+		return 1, fmt.Errorf("failed to list models: %w", err)
+	}
+	if len(models.Models) > 0 {
+		// print headers
+		logMessage(verboseNone, "%24s\t%s\n----", "name", "size")
+
+		for _, model := range models.Models {
+			if len(vbs) > 0 {
+				logMessage(verboseNone, "%24s\t%s\t%s", model.Name, humanize.Bytes(uint64(model.Size)), prettify(model.Details))
+			} else {
+				logMessage(verboseNone, "%24s\t%s", model.Name, humanize.Bytes(uint64(model.Size)))
+			}
+		}
+	} else {
+		logMessage(verboseMedium, "no local models were found.")
+	}
+
+	return 0, nil
+}
+
+// generate embeddings
+func doEmbeddings(ctx context.Context, conf config, p params) (exit int, e error) {
+	vbs := p.Verbose
+
+	logVerbose(verboseMedium, vbs, "generating embeddings...")
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(conf.TimeoutSeconds)*time.Second)
+	defer cancel()
+
+	// ollama api client
+	client, err := newClient()
+	if err != nil {
+		return 1, fmt.Errorf("failed to initialize Ollama API client: %w", err)
+	}
+
+	// generate embeddings
+	embeddings, err := client.Embeddings(ctx, &api.EmbeddingRequest{
+		Model:  *p.Model,
+		Prompt: *p.Prompt,
+	})
+	if err != nil {
+		return 1, fmt.Errorf("failed to generate embeddings: %w", err)
+	}
+
+	// print floats
+	floats, err := json.Marshal(embeddings.Embedding)
+	if err != nil {
+		return 1, fmt.Errorf("failed to marshal embeddings: %w", err)
+	}
+	logMessage(verboseNone, "%s", string(floats))
+
+	return 0, nil
 }
