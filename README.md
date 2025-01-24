@@ -36,6 +36,12 @@ and replace things with your own values.
 
 You can get the sample config file [here](https://github.com/meinside/oll/blob/master/config.json.sample).
 
+If your Ollama server is not running with default settings(eg: `localhost:11434`), you can run like:
+
+```bash
+$ OLLAMA_HOST=some.host.com:7777 oll -p "so long, and thanks for all the fish"
+```
+
 ## Run
 
 Here are some examples:
@@ -43,6 +49,9 @@ Here are some examples:
 ```bash
 # show the help message
 $ oll -h
+
+# list available (locally installed) models
+$ oll -l
 
 # generate with a text prompt
 $ oll -p "what is the answer to life, the universe, and everything?"
@@ -90,6 +99,15 @@ You can use multimodal models like [llava](https://ollama.com/library/llava) wit
 ```bash
 # generate with a multimodal model and image file(s)
 $ oll -m llava:7b -f ~/Downloads/some_image.png -p "what is this picture?"
+```
+
+### Generating Embeddings
+
+You can print embeddings of a given prompt in JSON format.
+
+```bash
+# generate with an embedding model
+$ oll -e -m nomic-embed-text -p "this is an apple"
 ```
 
 ### Others

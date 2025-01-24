@@ -4,6 +4,7 @@ go 1.23.5
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.1
+	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.18.0
 	github.com/gabriel-vasile/mimetype v1.4.8
 	github.com/jessevdk/go-flags v1.6.1
