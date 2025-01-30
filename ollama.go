@@ -96,6 +96,13 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 		"top_p":       generationTopP,
 		"top_k":       generationTopK,
 	}
+	if len(p.Stop) > 0 {
+		stopSequences := []string{}
+		for _, stop := range p.Stop {
+			stopSequences = append(stopSequences, *stop)
+		}
+		req.Options["stop"] = stopSequences
+	}
 	if p.OutputJSONScheme != nil {
 		if json.Valid([]byte(*p.OutputJSONScheme)) {
 			req.Format = json.RawMessage(*p.OutputJSONScheme)
@@ -161,9 +168,12 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 	}()
 
 	// wait for the generation to finish
-	res := <-ch
-
-	return res.exit, res.err
+	select {
+	case <-ctx.Done():
+		return 1, fmt.Errorf("generation timed out: %w", ctx.Err())
+	case res := <-ch:
+		return res.exit, res.err
+	}
 }
 
 // list models
