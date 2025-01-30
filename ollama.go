@@ -161,9 +161,12 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 	}()
 
 	// wait for the generation to finish
-	res := <-ch
-
-	return res.exit, res.err
+	select {
+	case <-ctx.Done():
+		return 1, fmt.Errorf("generation timed out: %w", ctx.Err())
+	case res := <-ch:
+		return res.exit, res.err
+	}
 }
 
 // list models
