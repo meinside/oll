@@ -10,11 +10,12 @@ type params struct {
 	ConfigFilepath *string `short:"c" long:"config" description:"Config file's path (default: $XDG_CONFIG_HOME/oll/config.json)"`
 
 	// for ollama model
-	Model             *string  `short:"m" long:"model" description:"Model to use (can be omitted)"`
-	SystemInstruction *string  `short:"s" long:"system" description:"System instruction (can be omitted)"`
-	Temperature       *float32 `long:"temperature" description:"'temperature' for generation (default: 1.0)"`
-	TopP              *float32 `long:"top-p" description:"'top_p' for generation (default: 0.95)"`
-	TopK              *int32   `long:"top-k" description:"'top_k' for generation (default: 20)"`
+	Model             *string   `short:"m" long:"model" description:"Model to use (can be omitted)"`
+	SystemInstruction *string   `short:"s" long:"system" description:"System instruction (can be omitted)"`
+	Temperature       *float32  `long:"temperature" description:"'temperature' for generation (default: 1.0)"`
+	TopP              *float32  `long:"top-p" description:"'top_p' for generation (default: 0.95)"`
+	TopK              *int32    `long:"top-k" description:"'top_k' for generation (default: 20)"`
+	Stop              []*string `long:"stop" description:"'stop' sequence string for generation (can be used multiple times)"`
 
 	// prompt and filepaths for generation
 	Prompt    *string   `short:"p" long:"prompt" description:"Prompt for generation (can also be read from stdin)"`
