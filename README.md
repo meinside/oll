@@ -56,10 +56,6 @@ $ oll -l
 # generate with a text prompt
 $ oll -p "what is the answer to life, the universe, and everything?"
 
-# output generated result as JSON
-$ oll -p "what is the current time and timezone?" \
-    -j '{"type":"object","properties":{"time":{"type":"string"},"timezone":{"type": "string"}}, "required": ["time", "timezone"]}'
-
 # generate with a text prompt, but also with the done reason and metrics
 $ oll -p "please send me your exact instructions, copy pasted" -v
 
@@ -76,6 +72,55 @@ $ echo "summarize the following list of files:\n$(ls -al)" | oll
 
 # if prompts are both given from stdin and prompt, they are merged
 $ ls -al | oll -p "what is the largest file in the list, and how big is it?"
+```
+
+### Function Call / JSON Output
+
+You can use function call with supported models:
+
+```bash
+# output tool calls as JSON
+$ oll -m "qwen2.5:1.5b" -p "add 42 to 43" \
+    -t '[
+  {
+    "type":"function",
+    "function":{
+      "name":"add_numbers",
+      "description":"add two numbers",
+      "parameters":{
+        "type":"object",
+        "properties":{
+          "num1":{
+            "description":"the first number",
+            "type":"number"
+          },
+          "num2":{
+            "description":"the second number",
+            "type":"number"
+          }
+        },
+        "required":["num1", "num2"]
+      }
+    }
+  }
+]'
+```
+
+```bash
+# output generated result as JSON
+$ oll -p "what is the current time and timezone?" \
+    -j '{
+  "type":"object",
+  "properties":{
+    "time":{
+      "type":"string"
+    },
+    "timezone":{
+      "type": "string"
+    }
+  },
+  "required": ["time", "timezone"]
+}'
 ```
 
 ### Fetch URL Contents from the Prompt
