@@ -73,11 +73,19 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 	logVerbose(verboseMaximum, vbs, "with converted prompt: '%s' and image files: %v", strings.TrimSpace(prompt), imageFiles)
 
 	// generation options
-	req := &api.GenerateRequest{
-		Model:  *p.Model,
-		System: *p.SystemInstruction,
-		Prompt: prompt,
-		Images: images,
+	req := &api.ChatRequest{
+		Model: *p.Model,
+		Messages: []api.Message{
+			{
+				Role:    "system",
+				Content: *p.SystemInstruction,
+			},
+			{
+				Role:    "user",
+				Content: prompt,
+				Images:  images,
+			},
+		},
 	}
 	generationTemperature := defaultGenerationTemperature
 	if p.Temperature != nil {
@@ -103,6 +111,14 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 		}
 		req.Options["stop"] = stopSequences
 	}
+	var tools []api.Tool = nil
+	if p.ToolConfig != nil {
+		if err := json.Unmarshal([]byte(*p.ToolConfig), &tools); err == nil {
+			req.Tools = tools
+		} else {
+			return 1, fmt.Errorf("failed to unmarshal tool config: %w", err)
+		}
+	}
 	if p.OutputJSONScheme != nil {
 		if json.Valid([]byte(*p.OutputJSONScheme)) {
 			req.Format = json.RawMessage(*p.OutputJSONScheme)
@@ -122,14 +138,24 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 	go func() {
 		endsWithNewLine := false
 
-		if err = client.Generate(
+		if err = client.Chat(
 			ctx,
 			req,
-			func(resp api.GenerateResponse) error {
-				if len(resp.Response) > 0 {
-					fmt.Print(resp.Response)
+			func(resp api.ChatResponse) error {
+				if resp.Message.Role == "assistant" {
+					if len(resp.Message.Content) > 0 {
+						logVerbose(verboseMaximum, vbs, "generated response:")
 
-					endsWithNewLine = strings.HasSuffix(resp.Response, "\n")
+						fmt.Print(resp.Message.Content)
+
+						endsWithNewLine = strings.HasSuffix(resp.Message.Content, "\n")
+					} else if len(resp.Message.ToolCalls) > 0 {
+						logVerbose(verboseMaximum, vbs, "generated tool calls:")
+
+						marshalled, _ := json.MarshalIndent(resp.Message.ToolCalls, "", "  ")
+
+						fmt.Printf("%s\n", string(marshalled))
+					}
 				}
 				if resp.Done {
 					if !endsWithNewLine {

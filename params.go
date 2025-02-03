@@ -27,6 +27,9 @@ type params struct {
 	// embedding
 	GenerateEmbeddings bool `short:"e" long:"gen-embeddings" description:"Generate embeddings of the prompt"`
 
+	// function calling
+	ToolConfig *string `short:"t" long:"tool-config" description:"Tool config for function calling (in JSON format)"`
+
 	// for fetching contents
 	ReplaceHTTPURLsInPrompt bool    `short:"x" long:"convert-urls" description:"Convert URLs in the prompt to their text representations"`
 	UserAgent               *string `long:"user-agent" description:"Override user-agent when fetching contents from URLs in the prompt"`
