@@ -28,15 +28,16 @@ type params struct {
 	GenerateEmbeddings bool `short:"e" long:"gen-embeddings" description:"Generate embeddings of the prompt"`
 
 	// function calling
-	ToolConfig *string `short:"t" long:"tool-config" description:"Tool config for function calling (in JSON format)"`
+	ToolConfig       *string `short:"t" long:"tool-config" description:"Tool config for function calling (in JSON format)"`
+	OutputJSONScheme *string `short:"j" long:"json" description:"Output result as this JSON scheme"`
 
 	// for fetching contents
 	ReplaceHTTPURLsInPrompt bool    `short:"x" long:"convert-urls" description:"Convert URLs in the prompt to their text representations"`
 	UserAgent               *string `long:"user-agent" description:"Override user-agent when fetching contents from URLs in the prompt"`
 
 	// other options
-	OutputJSONScheme *string `short:"j" long:"json" description:"Output result as this JSON scheme"`
-	Verbose          []bool  `short:"v" long:"verbose" description:"Show verbose logs (can be used multiple times)"`
+	OmitReasoning bool   `short:"r" long:"omit-reasoning" description:"Omit reasoning (<think></think>) while streaming the result"`
+	Verbose       []bool `short:"v" long:"verbose" description:"Show verbose logs (can be used multiple times)"`
 }
 
 // check if prompt is given in the params

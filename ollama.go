@@ -18,6 +18,9 @@ import (
 
 const (
 	defaultModel = "deepseek-r1"
+
+	reasoningStartTag = "<think>"
+	reasoningEndTag   = "</think>"
 )
 
 // generation parameter constants
@@ -137,6 +140,8 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 	ch := make(chan result, 1)
 	go func() {
 		endsWithNewLine := false
+		reasoning := false
+		firstContentAfterReasoning := false
 
 		if err = client.Chat(
 			ctx,
@@ -144,13 +149,48 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 			func(resp api.ChatResponse) error {
 				if resp.Message.Role == "assistant" {
 					if len(resp.Message.Content) > 0 {
-						logVerbose(verboseMaximum, vbs, "generated response:")
+						// handle the beginning of reasoning
+						if strings.Contains(resp.Message.Content, reasoningStartTag) {
+							logVerbose(
+								verboseMedium,
+								vbs,
+								"reasoning...",
+							)
 
-						fmt.Print(resp.Message.Content)
+							reasoning = true
+						}
 
-						endsWithNewLine = strings.HasSuffix(resp.Message.Content, "\n")
+						// print the generated content
+						if !p.OmitReasoning || !reasoning {
+							content := resp.Message.Content
+
+							// trim the first content after reasoning for removing unwanted newlines
+							if p.OmitReasoning && firstContentAfterReasoning {
+								content = strings.TrimSpace(content)
+								firstContentAfterReasoning = false
+							}
+
+							fmt.Print(content)
+							endsWithNewLine = strings.HasSuffix(content, "\n")
+						}
+
+						// handle the end of reasoning
+						if strings.Contains(resp.Message.Content, reasoningEndTag) {
+							logVerbose(
+								verboseMedium,
+								vbs,
+								"reasoning finished",
+							)
+
+							reasoning = false
+							firstContentAfterReasoning = true
+						}
 					} else if len(resp.Message.ToolCalls) > 0 {
-						logVerbose(verboseMaximum, vbs, "generated tool calls:")
+						logVerbose(
+							verboseMedium,
+							vbs,
+							"generated tool calls:",
+						)
 
 						marshalled, _ := json.MarshalIndent(resp.Message.ToolCalls, "", "  ")
 
