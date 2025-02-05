@@ -18,26 +18,33 @@ type params struct {
 	Stop              []*string `long:"stop" description:"'stop' sequence string for generation (can be used multiple times)"`
 
 	// prompt and filepaths for generation
-	Prompt    *string   `short:"p" long:"prompt" description:"Prompt for generation (can also be read from stdin)"`
-	Filepaths []*string `short:"f" long:"filepath" description:"Path of a file or directory (can be used multiple times)"`
+	//
+	// https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
+	Prompt           *string   `short:"p" long:"prompt" description:"Prompt for generation (can also be read from stdin)"`
+	Filepaths        []*string `short:"f" long:"filepath" description:"Path of a file or directory (can be used multiple times)"`
+	ToolConfig       *string   `short:"t" long:"tool-config" description:"Tool config for function calling (in JSON format)"`
+	OutputJSONScheme *string   `short:"j" long:"json" description:"Output result as this JSON scheme"`
+	HideReasoning    bool      `short:"r" long:"hide-reasoning" description:"Hide reasoning (<think></think>) while streaming the result"`
 
 	// list models
+	//
+	// https://github.com/ollama/ollama/blob/main/docs/api.md#list-local-models
 	ListModels bool `short:"l" long:"list-models" description:"List available models (locally installed)"`
 
 	// embedding
+	//
+	// https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings
 	GenerateEmbeddings bool `short:"e" long:"gen-embeddings" description:"Generate embeddings of the prompt"`
-
-	// function calling
-	ToolConfig       *string `short:"t" long:"tool-config" description:"Tool config for function calling (in JSON format)"`
-	OutputJSONScheme *string `short:"j" long:"json" description:"Output result as this JSON scheme"`
 
 	// for fetching contents
 	ReplaceHTTPURLsInPrompt bool    `short:"x" long:"convert-urls" description:"Convert URLs in the prompt to their text representations"`
 	UserAgent               *string `long:"user-agent" description:"Override user-agent when fetching contents from URLs in the prompt"`
 
+	// https://github.com/ollama/ollama/blob/main/docs/faq.md#how-can-i-specify-the-context-window-size
+	ContextWindowSize *int `short:"w" long:"context-window-size" description:"Context window size of the prompt (default: 2048)"`
+
 	// other options
-	OmitReasoning bool   `short:"r" long:"omit-reasoning" description:"Omit reasoning (<think></think>) while streaming the result"`
-	Verbose       []bool `short:"v" long:"verbose" description:"Show verbose logs (can be used multiple times)"`
+	Verbose []bool `short:"v" long:"verbose" description:"Show verbose logs (can be used multiple times)"`
 }
 
 // check if prompt is given in the params
