@@ -26,6 +26,9 @@ const (
 	// for replacing URLs in prompt to body texts
 	urlRegexp       = `https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)`
 	urlToTextFormat = "<link url=\"%[1]s\" content-type=\"%[2]s\">\n%[3]s\n</link>"
+
+	filesTagBegin = "<files>"
+	filesTagEnd   = "</files>"
 )
 
 // file/directory names to ignore while recursing directories
@@ -362,13 +365,21 @@ func uniqPtrs[T comparable](slice []*T) []*T {
 // convert given prompt & files for generation
 func convertPromptAndFiles(prompt string, filesInPrompt map[string][]byte, filepaths []*string) (convertedPrompt string, images []api.ImageData, err error) {
 	images = []api.ImageData{}
-	files := map[string][]byte{}
+
+	type f struct {
+		data     []byte
+		mimeType string
+	}
+	files := map[string]f{}
 
 	for url, file := range filesInPrompt {
 		if isImage, _ := supportedImage(file); isImage {
 			images = append(images, api.ImageData(file))
 		} else {
-			files[url] = file
+			files[url] = f{
+				mimeType: mimetype.Detect(file).String(),
+				data:     file,
+			}
 		}
 	}
 	for _, fp := range filepaths {
@@ -380,7 +391,10 @@ func convertPromptAndFiles(prompt string, filesInPrompt map[string][]byte, filep
 				if isImage, _ := supportedImagePath(*fp); isImage {
 					images = append(images, api.ImageData(bytes))
 				} else {
-					files[fbase] = bytes
+					files[fbase] = f{
+						mimeType: mimetype.Detect(bytes).String(),
+						data:     bytes,
+					}
 				}
 			} else {
 				return "", nil, fmt.Errorf("failed to read file for prompt: %w", err)
@@ -390,13 +404,20 @@ func convertPromptAndFiles(prompt string, filesInPrompt map[string][]byte, filep
 		}
 	}
 
-	// build up `convertedPrompt` with `files`
-	context := "<contexts>\n"
-	for location, file := range files {
-		context += fmt.Sprintf("<file location=\"%s\">\n%s\n</file>\n", location, string(file))
+	// build up prompt with contexts
+	contexts := []string{}
+	// (files)
+	if len(files) > 0 {
+		contexts = append(contexts, filesTagBegin)
+
+		for location, file := range files {
+			contexts = append(contexts, fmt.Sprintf("<file name=\"%[1]s\" type=\"%[2]s\">\n%[3]s\n</file>", location, file.mimeType, string(file.data)))
+		}
+
+		contexts = append(contexts, filesTagEnd+"\n\n")
 	}
-	context += "</contexts>\n"
-	return fmt.Sprintf("%s\n%s", context, prompt), images, nil
+
+	return fmt.Sprintf("%s%s", strings.Join(contexts, "\n"), prompt), images, nil
 }
 
 func supportedImage(data []byte) (supported bool, err error) {

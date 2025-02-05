@@ -41,6 +41,8 @@ func newClient() (*api.Client, error) {
 }
 
 // generate text with given things
+//
+// https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
 func doGeneration(ctx context.Context, conf config, p params) (exit int, e error) {
 	vbs := p.Verbose
 
@@ -72,6 +74,8 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 	for _, img := range imageFiles {
 		images = append(images, api.ImageData(img))
 	}
+
+	// TODO: return error when the context length is exceeded
 
 	logVerbose(verboseMaximum, vbs, "with converted prompt: '%s' and image files: %v", strings.TrimSpace(prompt), imageFiles)
 
@@ -106,6 +110,9 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 		"temperature": generationTemperature,
 		"top_p":       generationTopP,
 		"top_k":       generationTopK,
+	}
+	if p.ContextWindowSize != nil {
+		req.Options["num_ctx"] = *p.ContextWindowSize
 	}
 	if len(p.Stop) > 0 {
 		stopSequences := []string{}
@@ -161,11 +168,11 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 						}
 
 						// print the generated content
-						if !p.OmitReasoning || !reasoning {
+						if !p.HideReasoning || !reasoning {
 							content := resp.Message.Content
 
 							// trim the first content after reasoning for removing unwanted newlines
-							if p.OmitReasoning && firstContentAfterReasoning {
+							if p.HideReasoning && firstContentAfterReasoning {
 								content = strings.TrimSpace(content)
 								firstContentAfterReasoning = false
 							}
@@ -243,6 +250,8 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 }
 
 // list models
+//
+// https://github.com/ollama/ollama/blob/main/docs/api.md#list-local-models
 func doListModels(ctx context.Context, conf config, p params) (exit int, e error) {
 	vbs := p.Verbose
 
@@ -281,6 +290,8 @@ func doListModels(ctx context.Context, conf config, p params) (exit int, e error
 }
 
 // generate embeddings
+//
+// https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings
 func doEmbeddings(ctx context.Context, conf config, p params) (exit int, e error) {
 	vbs := p.Verbose
 
@@ -295,10 +306,18 @@ func doEmbeddings(ctx context.Context, conf config, p params) (exit int, e error
 		return 1, fmt.Errorf("failed to initialize Ollama API client: %w", err)
 	}
 
+	options := map[string]any{}
+	if p.ContextWindowSize != nil {
+		options["num_ctx"] = *p.ContextWindowSize
+	}
+
+	// TODO: return error when the context length is exceeded
+
 	// generate embeddings
 	embeddings, err := client.Embeddings(ctx, &api.EmbeddingRequest{
-		Model:  *p.Model,
-		Prompt: *p.Prompt,
+		Model:   *p.Model,
+		Prompt:  *p.Prompt,
+		Options: options,
 	})
 	if err != nil {
 		return 1, fmt.Errorf("failed to generate embeddings: %w", err)

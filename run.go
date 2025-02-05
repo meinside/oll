@@ -24,6 +24,7 @@ Respond to user messages according to the following principles:
 - Be as accurate as possible.
 - Be as truthful as possible.
 - Be as comprehensive and informative as possible.
+- When textual files are provided for context, they will be listed between the '` + filesTagBegin + filesTagEnd + `' tags in the prompt, so make sure to use them if provided.
 `
 
 	defaultTimeoutSeconds         = 5 * 60 // 5 minutes

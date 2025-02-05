@@ -159,6 +159,18 @@ $ oll -e -m nomic-embed-text -p "this is an apple"
 
 With verbose flags (`-v`, `-vv`, and `-vvv`) you can see more detailed information like generation metrics and request parameters.
 
+## Known Issues
+
+### Prompt Gets Truncated Unexpectedly
+
+When the input prompt exceeds the context window, it [gets truncated silently](https://github.com/ollama/ollama/issues/7043) with warnings like this:
+
+```bash
+level=WARN source=runner.go:129 msg="truncating input prompt" limit=2048 prompt=2565 keep=5 new=2048
+```
+
+Try again with `-w` or `--context-window-size` parameter, or trim the prompt manually before generation.
+
 ## License
 
 MIT
