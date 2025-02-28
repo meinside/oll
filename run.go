@@ -77,7 +77,7 @@ func run(parser *flags.Parser, p params) (exitCode int, err error) {
 		if p.GenerateEmbeddings {
 			logVerbose(verboseMaximum, p.Verbose, "embeddings request params with prompt: %s\n\n", prettify(p))
 
-			return doEmbeddings(context.TODO(), conf, p)
+			return doEmbeddingsGeneration(context.TODO(), conf, p)
 		} else {
 			logVerbose(verboseMaximum, p.Verbose, "generation request params with prompt: %s\n\n", prettify(p))
 

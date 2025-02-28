@@ -541,3 +541,75 @@ func checkMimeType(mimeType *mimetype.MIME) (matched string, supported bool) {
 		}
 	}(mimeType)
 }
+
+const (
+	defaultChunkedTextLengthInBytes    uint = 1024 * 1024 * 2
+	defaultOverlappedTextLengthInBytes uint = defaultChunkedTextLengthInBytes / 100
+)
+
+// TextChunkOption contains options for chunking text.
+type TextChunkOption struct {
+	ChunkSize                uint
+	OverlappedSize           uint
+	KeepBrokenUTF8Characters bool
+	EllipsesText             string
+}
+
+// ChunkedText contains the original text and the chunks.
+type ChunkedText struct {
+	Original string
+	Chunks   []string
+}
+
+// ChunkText splits the given text into chunks of the specified size.
+func ChunkText(text string, opts ...TextChunkOption) (ChunkedText, error) {
+	opt := TextChunkOption{
+		ChunkSize:      defaultChunkedTextLengthInBytes,
+		OverlappedSize: defaultOverlappedTextLengthInBytes,
+	}
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+
+	chunkSize := opt.ChunkSize
+	overlappedSize := opt.OverlappedSize
+	keepBrokenUTF8Chars := opt.KeepBrokenUTF8Characters
+	ellipses := opt.EllipsesText
+
+	// check `opt`
+	if overlappedSize >= chunkSize {
+		return ChunkedText{}, fmt.Errorf("overlapped size(= %d) must be less than chunk size(= %d)", overlappedSize, chunkSize)
+	}
+
+	var chunk string
+	var chunks []string
+	for start := 0; start < len(text); start += int(chunkSize) {
+		end := min(start+int(chunkSize), len(text))
+
+		// cut text
+		offset := start
+		if offset > int(overlappedSize) {
+			offset -= int(overlappedSize)
+		}
+		if keepBrokenUTF8Chars {
+			chunk = text[offset:end]
+		} else {
+			chunk = strings.ToValidUTF8(text[offset:end], "")
+		}
+
+		// append ellipses
+		if start > 0 {
+			chunk = ellipses + chunk
+		}
+		if end < len(text) {
+			chunk = chunk + ellipses
+		}
+
+		chunks = append(chunks, chunk)
+	}
+
+	return ChunkedText{
+		Original: text,
+		Chunks:   chunks,
+	}, nil
+}
