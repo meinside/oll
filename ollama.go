@@ -28,6 +28,9 @@ const (
 	defaultGenerationTemperature = float32(1.0)
 	defaultGenerationTopP        = float32(0.95)
 	defaultGenerationTopK        = int32(20)
+
+	defaultEmbeddingsChunkSize           uint = 2048 * 2
+	defaultEmbeddingsChunkOverlappedSize uint = 64
 )
 
 // return a newly created ollama api client
@@ -43,7 +46,11 @@ func newClient() (*api.Client, error) {
 // generate text with given things
 //
 // https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
-func doGeneration(ctx context.Context, conf config, p params) (exit int, e error) {
+func doGeneration(
+	ctx context.Context,
+	conf config,
+	p params,
+) (exit int, e error) {
 	vbs := p.Verbose
 
 	logVerbose(verboseMedium, vbs, "generating...")
@@ -252,7 +259,11 @@ func doGeneration(ctx context.Context, conf config, p params) (exit int, e error
 // list models
 //
 // https://github.com/ollama/ollama/blob/main/docs/api.md#list-local-models
-func doListModels(ctx context.Context, conf config, p params) (exit int, e error) {
+func doListModels(
+	ctx context.Context,
+	conf config,
+	p params,
+) (exit int, e error) {
 	vbs := p.Verbose
 
 	logVerbose(verboseMedium, vbs, "listing models...")
@@ -292,10 +303,31 @@ func doListModels(ctx context.Context, conf config, p params) (exit int, e error
 // generate embeddings
 //
 // https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings
-func doEmbeddings(ctx context.Context, conf config, p params) (exit int, e error) {
+func doEmbeddingsGeneration(
+	ctx context.Context,
+	conf config,
+	p params,
+) (exit int, e error) {
 	vbs := p.Verbose
 
 	logVerbose(verboseMedium, vbs, "generating embeddings...")
+
+	if p.EmbeddingsChunkSize == nil {
+		p.EmbeddingsChunkSize = ptr(defaultEmbeddingsChunkSize)
+	}
+	if p.EmbeddingsOverlappedChunkSize == nil {
+		p.EmbeddingsOverlappedChunkSize = ptr(defaultEmbeddingsChunkOverlappedSize)
+	}
+
+	// chunk prompt text
+	chunks, err := ChunkText(*p.Prompt, TextChunkOption{
+		ChunkSize:      *p.EmbeddingsChunkSize,
+		OverlappedSize: *p.EmbeddingsOverlappedChunkSize,
+		EllipsesText:   "...",
+	})
+	if err != nil {
+		return 1, fmt.Errorf("failed to chunk text: %w", err)
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(conf.TimeoutSeconds)*time.Second)
 	defer cancel()
@@ -311,20 +343,37 @@ func doEmbeddings(ctx context.Context, conf config, p params) (exit int, e error
 		options["num_ctx"] = *p.ContextWindowSize
 	}
 
-	// TODO: return error when the context length is exceeded
-
-	// generate embeddings
-	embeddings, err := client.Embeddings(ctx, &api.EmbeddingRequest{
-		Model:   *p.Model,
-		Prompt:  *p.Prompt,
-		Options: options,
-	})
-	if err != nil {
-		return 1, fmt.Errorf("failed to generate embeddings: %w", err)
+	// iterate chunks and generate embeddings
+	type embedding struct {
+		Text    string    `json:"text"`
+		Vectors []float64 `json:"vectors"`
+	}
+	type embeddings struct {
+		Original string      `json:"original"`
+		Chunks   []embedding `json:"chunks"`
+	}
+	embeds := embeddings{
+		Original: *p.Prompt,
+		Chunks:   []embedding{},
+	}
+	for i, text := range chunks.Chunks {
+		embeddings, err := client.Embeddings(ctx, &api.EmbeddingRequest{
+			Model:   *p.Model,
+			Prompt:  text,
+			Options: options,
+		})
+		if err != nil {
+			return 1, fmt.Errorf("embeddings failed for chunk[%d]: %w", i, err)
+		} else {
+			embeds.Chunks = append(embeds.Chunks, embedding{
+				Text:    text,
+				Vectors: embeddings.Embedding,
+			})
+		}
 	}
 
 	// print floats
-	floats, err := json.Marshal(embeddings.Embedding)
+	floats, err := json.Marshal(embeds)
 	if err != nil {
 		return 1, fmt.Errorf("failed to marshal embeddings: %w", err)
 	}

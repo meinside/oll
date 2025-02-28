@@ -34,7 +34,9 @@ type params struct {
 	// embedding
 	//
 	// https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings
-	GenerateEmbeddings bool `short:"e" long:"gen-embeddings" description:"Generate embeddings of the prompt"`
+	GenerateEmbeddings            bool  `short:"e" long:"gen-embeddings" description:"Generate embeddings of the prompt"`
+	EmbeddingsChunkSize           *uint `long:"embeddings-chunk-size" description:"Chunk size for embeddings (default: 4096)"`
+	EmbeddingsOverlappedChunkSize *uint `long:"embeddings-overlapped-chunk-size" description:"Overlapped size of chunks for embeddings (default: 64)"`
 
 	// for fetching contents
 	ReplaceHTTPURLsInPrompt bool    `short:"x" long:"convert-urls" description:"Convert URLs in the prompt to their text representations"`
