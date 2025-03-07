@@ -72,6 +72,9 @@ $ echo "summarize the following list of files:\n$(ls -al)" | oll
 
 # if prompts are both given from stdin and prompt, they are merged
 $ ls -al | oll -p "what is the largest file in the list, and how big is it?"
+$ curl https://api.coincap.io/v2/assets \
+    | jq -c '[.data[] | {id, priceUsd}][0:10]' \
+    | oll -p "what's the current price of bitcoin?"
 ```
 
 ### Function Call / JSON Output
@@ -134,7 +137,7 @@ Supported content types are:
 
 ```bash
 # generate with a text prompt which includes some urls in it 
-$ oll -x -p "what's the current price of bitcoin? here's the data: https://api.coincap.io/v2/assets
+$ oll -x -p "what's the current price of bitcoin? here's the data: https://api.coincap.io/v2/assets" # NOTE: there might be a warning: "truncating input prompt"
 ```
 
 ### Generation with Multimodal Models
