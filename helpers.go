@@ -269,44 +269,44 @@ func fetchContent(timeoutSeconds int, userAgent, url string, vbs []bool) (conver
 					_ = doc.Find("link[rel=\"stylesheet\"]").Remove() // css links
 					_ = doc.Find("style").Remove()                    // embeded css tyles
 
-					converted = []byte(fmt.Sprintf(urlToTextFormat, url, contentType, removeConsecutiveEmptyLines(doc.Text())))
+					converted = fmt.Appendf(nil, urlToTextFormat, url, contentType, removeConsecutiveEmptyLines(doc.Text()))
 				} else {
-					converted = []byte(fmt.Sprintf(urlToTextFormat, url, contentType, "Failed to read this HTML document."))
+					converted = fmt.Appendf(nil, urlToTextFormat, url, contentType, "Failed to read this HTML document.")
 					err = fmt.Errorf("failed to read document (%s) from '%s': %w", contentType, url, err)
 				}
 			} else if strings.HasPrefix(contentType, "text/") {
 				var bytes []byte
 				if bytes, err = io.ReadAll(resp.Body); err == nil {
-					converted = []byte(fmt.Sprintf(urlToTextFormat, url, contentType, removeConsecutiveEmptyLines(string(bytes)))) // NOTE: removing redundant empty lines
+					converted = fmt.Appendf(nil, urlToTextFormat, url, contentType, removeConsecutiveEmptyLines(string(bytes))) // NOTE: removing redundant empty lines
 				} else {
-					converted = []byte(fmt.Sprintf(urlToTextFormat, url, contentType, "Failed to read this document."))
+					converted = fmt.Appendf(nil, urlToTextFormat, url, contentType, "Failed to read this document.")
 					err = fmt.Errorf("failed to read document (%s) from '%s': %w", contentType, url, err)
 				}
 			} else if strings.HasPrefix(contentType, "application/json") {
 				var bytes []byte
 				if bytes, err = io.ReadAll(resp.Body); err == nil {
-					converted = []byte(fmt.Sprintf(urlToTextFormat, url, contentType, string(bytes)))
+					converted = fmt.Appendf(nil, urlToTextFormat, url, contentType, string(bytes))
 				} else {
-					converted = []byte(fmt.Sprintf(urlToTextFormat, url, contentType, "Failed to read this document."))
+					converted = fmt.Appendf(nil, urlToTextFormat, url, contentType, "Failed to read this document.")
 					err = fmt.Errorf("failed to read document (%s) from '%s': %w", contentType, url, err)
 				}
 			} else {
-				converted = []byte(fmt.Sprintf(urlToTextFormat, url, contentType, fmt.Sprintf("Content type '%s' not supported.", contentType)))
+				converted = fmt.Appendf(nil, urlToTextFormat, url, contentType, fmt.Sprintf("Content type '%s' not supported.", contentType))
 				err = fmt.Errorf("content (%s) from '%s' not supported", contentType, url)
 			}
 		} else {
 			if converted, err = io.ReadAll(resp.Body); err == nil {
 				if matched, supported, _ := supportedMimeType(converted); !supported {
-					converted = []byte(fmt.Sprintf(urlToTextFormat, url, matched, fmt.Sprintf("Content type '%s' not supported.", matched)))
+					converted = fmt.Appendf(nil, urlToTextFormat, url, matched, fmt.Sprintf("Content type '%s' not supported.", matched))
 					err = fmt.Errorf("content (%s) from '%s' not supported", matched, url)
 				}
 			} else {
-				converted = []byte(fmt.Sprintf(urlToTextFormat, url, contentType, "Failed to read this file."))
+				converted = fmt.Appendf(nil, urlToTextFormat, url, contentType, "Failed to read this file.")
 				err = fmt.Errorf("failed to read file (%s) from '%s': %w", contentType, url, err)
 			}
 		}
 	} else {
-		converted = []byte(fmt.Sprintf(urlToTextFormat, url, contentType, fmt.Sprintf("HTTP Error %d", resp.StatusCode)))
+		converted = fmt.Appendf(nil, urlToTextFormat, url, contentType, fmt.Sprintf("HTTP Error %d", resp.StatusCode))
 		err = fmt.Errorf("http error %d from '%s'", resp.StatusCode, url)
 	}
 
@@ -319,7 +319,7 @@ func fetchContent(timeoutSeconds int, userAgent, url string, vbs []bool) (conver
 func removeConsecutiveEmptyLines(input string) string {
 	// trim each line
 	trimmed := []string{}
-	for _, line := range strings.Split(input, "\n") {
+	for line := range strings.SplitSeq(input, "\n") {
 		trimmed = append(trimmed, strings.TrimRight(line, " "))
 	}
 	input = strings.Join(trimmed, "\n")
