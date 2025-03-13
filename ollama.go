@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultModel = "deepseek-r1"
+	defaultModel = "gemma3:12b"
 
 	reasoningStartTag = "<think>"
 	reasoningEndTag   = "</think>"
