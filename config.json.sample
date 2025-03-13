@@ -3,7 +3,7 @@
   // NOTE: if not set here, default values will be used instead
 
   // settings for model
-  //"default_model": "deepseek-r1",
+  //"default_model": "gemma3:12b",
   //"system_instruction": "You are a chat bot which responds to user requests reliably and accurately.",
 
   // network timeout seconds (for fetching urls, and/or generating responses)
