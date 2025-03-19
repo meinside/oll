@@ -80,6 +80,7 @@ $ curl https://api.coincap.io/v2/assets \
 ### Function Call / JSON Output
 
 You can use function call with supported models:
+(NOTE: some models may not support tools)
 
 ```bash
 # output tool calls as JSON
@@ -142,16 +143,16 @@ $ oll -x -p "what's the current price of bitcoin? here's the data: https://api.c
 
 ### Generation with Multimodal Models
 
-You can use multimodal models like [llava](https://ollama.com/library/llava) with `-m` or `--model` parameter.
+You can use [vision models](https://ollama.com/search?c=vision) with `-m` or `--model` parameter.
 
 ```bash
 # generate with a multimodal model and image file(s)
-$ oll -m llava:7b -f ~/Downloads/some_image.png -p "what is this picture?"
+$ oll -m gemma3:12b -f ~/Downloads/some_image.png -p "what is this picture?"
 ```
 
 ### Generating Embeddings
 
-You can print embeddings of a given prompt in JSON format.
+You can print [embeddings](https://ollama.com/search?c=embedding) of a given prompt in JSON format.
 
 ```bash
 # generate with an embedding model
