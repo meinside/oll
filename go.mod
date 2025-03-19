@@ -11,7 +11,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.8
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jwalton/go-supportscolor v1.2.0
-	github.com/ollama/ollama v0.6.0
+	github.com/ollama/ollama v0.6.2
 	github.com/tailscale/hujson v0.0.0-20250226034555-ec1d1c113d33
 )
 
