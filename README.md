@@ -138,7 +138,7 @@ Supported content types are:
 
 ```bash
 # generate with a text prompt which includes some urls in it 
-$ oll -x -p "what's the current price of bitcoin? here's the data: https://api.coincap.io/v2/assets" # NOTE: there might be a warning: "truncating input prompt"
+$ oll -x -p "what's the latest book of douglas adams? check from here: https://openlibrary.org/search/authors.json?q=douglas%20adams" # NOTE: there might be a warning: "truncating input prompt"
 ```
 
 ### Generation with Multimodal Models

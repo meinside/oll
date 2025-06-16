@@ -137,7 +137,7 @@ func filesInDir(dir string, vbs []bool) ([]*string, error) {
 
 // expand given filepaths (expand directories with their sub files)
 func expandFilepaths(p params) (expanded []*string, err error) {
-	filepaths := p.Filepaths
+	filepaths := p.Generation.Filepaths
 	if filepaths == nil {
 		return nil, nil
 	}
@@ -198,7 +198,7 @@ func expandFilepaths(p params) (expanded []*string, err error) {
 // files that were not converted to text will be returned as `files`.
 func replaceURLsInPrompt(conf config, p params) (replaced string, files map[string][]byte) {
 	userAgent := *p.UserAgent
-	prompt := *p.Prompt
+	prompt := *p.Generation.Prompt
 	vbs := p.Verbose
 
 	files = map[string][]byte{}

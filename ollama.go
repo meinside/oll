@@ -64,7 +64,7 @@ func doGeneration(
 		return 1, fmt.Errorf("failed to initialize Ollama API client: %w", err)
 	}
 
-	prompt := *p.Prompt
+	prompt := *p.Generation.Prompt
 	filesInPrompt := map[string][]byte{}
 	if p.ReplaceHTTPURLsInPrompt {
 		prompt, filesInPrompt = replaceURLsInPrompt(conf, p)
@@ -73,7 +73,7 @@ func doGeneration(
 	}
 
 	// convert prompt with/without files
-	prompt, imageFiles, err := convertPromptAndFiles(prompt, filesInPrompt, p.Filepaths)
+	prompt, imageFiles, err := convertPromptAndFiles(prompt, filesInPrompt, p.Generation.Filepaths)
 	if err != nil {
 		return 1, fmt.Errorf("failed to convert prompt and files: %w", err)
 	}
@@ -92,7 +92,7 @@ func doGeneration(
 		Messages: []api.Message{
 			{
 				Role:    "system",
-				Content: *p.SystemInstruction,
+				Content: *p.Generation.SystemInstruction,
 			},
 			{
 				Role:    "user",
@@ -102,16 +102,16 @@ func doGeneration(
 		},
 	}
 	generationTemperature := defaultGenerationTemperature
-	if p.Temperature != nil {
-		generationTemperature = *p.Temperature
+	if p.Generation.Temperature != nil {
+		generationTemperature = *p.Generation.Temperature
 	}
 	generationTopP := defaultGenerationTopP
-	if p.TopP != nil {
-		generationTopP = *p.TopP
+	if p.Generation.TopP != nil {
+		generationTopP = *p.Generation.TopP
 	}
 	generationTopK := defaultGenerationTopK
-	if p.TopK != nil {
-		generationTopK = *p.TopK
+	if p.Generation.TopK != nil {
+		generationTopK = *p.Generation.TopK
 	}
 	req.Options = map[string]any{
 		"temperature": generationTemperature,
@@ -121,26 +121,26 @@ func doGeneration(
 	if p.ContextWindowSize != nil {
 		req.Options["num_ctx"] = *p.ContextWindowSize
 	}
-	if len(p.Stop) > 0 {
+	if len(p.Generation.Stop) > 0 {
 		stopSequences := []string{}
-		for _, stop := range p.Stop {
+		for _, stop := range p.Generation.Stop {
 			stopSequences = append(stopSequences, *stop)
 		}
 		req.Options["stop"] = stopSequences
 	}
 	var tools []api.Tool = nil
-	if p.ToolConfig != nil {
-		if err := json.Unmarshal([]byte(*p.ToolConfig), &tools); err == nil {
+	if p.Generation.ToolConfig != nil {
+		if err := json.Unmarshal([]byte(*p.Generation.ToolConfig), &tools); err == nil {
 			req.Tools = tools
 		} else {
 			return 1, fmt.Errorf("failed to unmarshal tool config: %w", err)
 		}
 	}
-	if p.OutputJSONScheme != nil {
-		if json.Valid([]byte(*p.OutputJSONScheme)) {
-			req.Format = json.RawMessage(*p.OutputJSONScheme)
+	if p.Generation.OutputJSONScheme != nil {
+		if json.Valid([]byte(*p.Generation.OutputJSONScheme)) {
+			req.Format = json.RawMessage(*p.Generation.OutputJSONScheme)
 		} else {
-			return 1, fmt.Errorf("invalid output JSON scheme: `%s`", *p.OutputJSONScheme)
+			return 1, fmt.Errorf("invalid output JSON scheme: `%s`", *p.Generation.OutputJSONScheme)
 		}
 	}
 
@@ -175,11 +175,11 @@ func doGeneration(
 						}
 
 						// print the generated content
-						if !p.HideReasoning || !reasoning {
+						if !p.Generation.HideReasoning || !reasoning {
 							content := resp.Message.Content
 
 							// trim the first content after reasoning for removing unwanted newlines
-							if p.HideReasoning && firstContentAfterReasoning {
+							if p.Generation.HideReasoning && firstContentAfterReasoning {
 								content = strings.TrimSpace(content)
 								firstContentAfterReasoning = false
 							}
@@ -312,17 +312,17 @@ func doEmbeddingsGeneration(
 
 	logVerbose(verboseMedium, vbs, "generating embeddings...")
 
-	if p.EmbeddingsChunkSize == nil {
-		p.EmbeddingsChunkSize = ptr(defaultEmbeddingsChunkSize)
+	if p.Embeddings.EmbeddingsChunkSize == nil {
+		p.Embeddings.EmbeddingsChunkSize = ptr(defaultEmbeddingsChunkSize)
 	}
-	if p.EmbeddingsOverlappedChunkSize == nil {
-		p.EmbeddingsOverlappedChunkSize = ptr(defaultEmbeddingsChunkOverlappedSize)
+	if p.Embeddings.EmbeddingsOverlappedChunkSize == nil {
+		p.Embeddings.EmbeddingsOverlappedChunkSize = ptr(defaultEmbeddingsChunkOverlappedSize)
 	}
 
 	// chunk prompt text
-	chunks, err := ChunkText(*p.Prompt, TextChunkOption{
-		ChunkSize:      *p.EmbeddingsChunkSize,
-		OverlappedSize: *p.EmbeddingsOverlappedChunkSize,
+	chunks, err := ChunkText(*p.Generation.Prompt, TextChunkOption{
+		ChunkSize:      *p.Embeddings.EmbeddingsChunkSize,
+		OverlappedSize: *p.Embeddings.EmbeddingsOverlappedChunkSize,
 		EllipsesText:   "...",
 	})
 	if err != nil {
@@ -353,7 +353,7 @@ func doEmbeddingsGeneration(
 		Chunks   []embedding `json:"chunks"`
 	}
 	embeds := embeddings{
-		Original: *p.Prompt,
+		Original: *p.Generation.Prompt,
 		Chunks:   []embedding{},
 	}
 	for i, text := range chunks.Chunks {
