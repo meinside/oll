@@ -6,25 +6,33 @@ package main
 
 // parameter definitions
 type params struct {
+	// for showing the version
+	ShowVersion bool `long:"version" description:"Show the version of this application"`
+
 	// config file's path
 	ConfigFilepath *string `short:"c" long:"config" description:"Config file's path (default: $XDG_CONFIG_HOME/oll/config.json)"`
 
 	// for ollama model
-	Model             *string   `short:"m" long:"model" description:"Model to use (can be omitted)"`
-	SystemInstruction *string   `short:"s" long:"system" description:"System instruction (can be omitted)"`
-	Temperature       *float32  `long:"temperature" description:"'temperature' for generation (default: 1.0)"`
-	TopP              *float32  `long:"top-p" description:"'top_p' for generation (default: 0.95)"`
-	TopK              *int32    `long:"top-k" description:"'top_k' for generation (default: 20)"`
-	Stop              []*string `long:"stop" description:"'stop' sequence string for generation (can be used multiple times)"`
+	Model *string `short:"m" long:"model" description:"Model to use (can be omitted)"`
 
-	// prompt and filepaths for generation
+	// parameters for generation
 	//
 	// https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
-	Prompt           *string   `short:"p" long:"prompt" description:"Prompt for generation (can also be read from stdin)"`
-	Filepaths        []*string `short:"f" long:"filepath" description:"Path of a file or directory (can be used multiple times)"`
-	ToolConfig       *string   `short:"t" long:"tool-config" description:"Tool config for function calling (in JSON format)"`
-	OutputJSONScheme *string   `short:"j" long:"json" description:"Output result as this JSON scheme"`
-	HideReasoning    bool      `short:"r" long:"hide-reasoning" description:"Hide reasoning (<think></think>) while streaming the result"`
+	Generation struct {
+		Prompt            *string   `short:"p" long:"prompt" description:"Prompt for generation (can also be read from stdin)"`
+		Filepaths         []*string `short:"f" long:"filepath" description:"Path of a file or directory (can be used multiple times)"`
+		SystemInstruction *string   `short:"s" long:"system" description:"System instruction (can be omitted)"`
+
+		Temperature *float32  `long:"temperature" description:"'temperature' for generation (default: 1.0)"`
+		TopP        *float32  `long:"top-p" description:"'top_p' for generation (default: 0.95)"`
+		TopK        *int32    `long:"top-k" description:"'top_k' for generation (default: 20)"`
+		Stop        []*string `long:"stop" description:"'stop' sequence string for generation (can be used multiple times)"`
+
+		ToolConfig       *string `short:"t" long:"tool-config" description:"Tool config for function calling (in JSON format)"`
+		OutputJSONScheme *string `short:"j" long:"json" description:"Output result as this JSON scheme"`
+
+		HideReasoning bool `short:"r" long:"hide-reasoning" description:"Hide reasoning (<think></think>) while streaming the result"`
+	} `group:"Generation"`
 
 	// list models
 	//
@@ -34,9 +42,11 @@ type params struct {
 	// embedding
 	//
 	// https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings
-	GenerateEmbeddings            bool  `short:"e" long:"gen-embeddings" description:"Generate embeddings of the prompt"`
-	EmbeddingsChunkSize           *uint `long:"embeddings-chunk-size" description:"Chunk size for embeddings (default: 4096)"`
-	EmbeddingsOverlappedChunkSize *uint `long:"embeddings-overlapped-chunk-size" description:"Overlapped size of chunks for embeddings (default: 64)"`
+	Embeddings struct {
+		GenerateEmbeddings            bool  `short:"e" long:"gen-embeddings" description:"Generate embeddings of the prompt"`
+		EmbeddingsChunkSize           *uint `long:"embeddings-chunk-size" description:"Chunk size for embeddings (default: 4096)"`
+		EmbeddingsOverlappedChunkSize *uint `long:"embeddings-overlapped-chunk-size" description:"Overlapped size of chunks for embeddings (default: 64)"`
+	} `group:"Embeddings"`
 
 	// for fetching contents
 	ReplaceHTTPURLsInPrompt bool    `short:"x" long:"convert-urls" description:"Convert URLs in the prompt to their text representations"`
@@ -51,13 +61,16 @@ type params struct {
 
 // check if prompt is given in the params
 func (p *params) hasPrompt() bool {
-	return p.Prompt != nil && len(*p.Prompt) > 0
+	return p.Generation.Prompt != nil && len(*p.Generation.Prompt) > 0
 }
 
 // check if any task is requested
 // FIXME: TODO: need to be fixed whenever a new task is added
 func (p *params) taskRequested() bool {
-	return p.hasPrompt() || p.ListModels || p.GenerateEmbeddings
+	return p.hasPrompt() ||
+		p.ListModels ||
+		p.Embeddings.GenerateEmbeddings ||
+		p.ShowVersion
 }
 
 // check if multiple tasks are requested
@@ -74,9 +87,16 @@ func (p *params) multipleTaskRequested() bool {
 			promptCounted = true
 		}
 	}
-	if p.GenerateEmbeddings { // generate embeddings
+	if p.Embeddings.GenerateEmbeddings { // generate embeddings
 		num++
 		if hasPrompt && !promptCounted {
+			promptCounted = true
+		}
+	}
+	if p.ShowVersion { // show version
+		num++
+		if hasPrompt && !promptCounted {
+			num++
 			promptCounted = true
 		}
 	}

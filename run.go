@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jessevdk/go-flags"
+	"github.com/meinside/version-go"
 )
 
 const (
@@ -41,11 +42,23 @@ func run(parser *flags.Parser, p params) (exitCode int, err error) {
 		return printHelpBeforeExit(1, parser), nil
 	}
 
+	// early return after printing the version
+	if p.ShowVersion {
+		logMessage(
+			verboseMinimum,
+			"%s %s\n\n",
+			appName,
+			version.Build(version.OS|version.Architecture),
+		)
+
+		return printHelpBeforeExit(0, parser), nil
+	}
+
 	// read and apply configs
 	var conf config
 	if conf, err = readConfig(resolveConfigFilepath(p.ConfigFilepath)); err == nil {
-		if p.SystemInstruction == nil && conf.SystemInstruction != nil {
-			p.SystemInstruction = conf.SystemInstruction
+		if p.Generation.SystemInstruction == nil && conf.SystemInstruction != nil {
+			p.Generation.SystemInstruction = conf.SystemInstruction
 		}
 	} else {
 		return 1, fmt.Errorf("failed to read configuration: %w", err)
@@ -60,21 +73,21 @@ func run(parser *flags.Parser, p params) (exitCode int, err error) {
 	if p.Model == nil {
 		p.Model = ptr(defaultModel)
 	}
-	if p.SystemInstruction == nil {
-		p.SystemInstruction = ptr(defaultSystemInstruction(p))
+	if p.Generation.SystemInstruction == nil {
+		p.Generation.SystemInstruction = ptr(defaultSystemInstruction(p))
 	}
 	if p.UserAgent == nil {
 		p.UserAgent = ptr(defaultUserAgent)
 	}
 
 	// expand filepaths (recurse directories)
-	p.Filepaths, err = expandFilepaths(p)
+	p.Generation.Filepaths, err = expandFilepaths(p)
 	if err != nil {
 		return 1, fmt.Errorf("failed to read given filepaths: %w", err)
 	}
 
 	if p.hasPrompt() { // if prompt is given,
-		if p.GenerateEmbeddings {
+		if p.Embeddings.GenerateEmbeddings {
 			logVerbose(verboseMaximum, p.Verbose, "embeddings request params with prompt: %s\n\n", prettify(p))
 
 			return doEmbeddingsGeneration(context.TODO(), conf, p)
