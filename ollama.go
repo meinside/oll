@@ -18,9 +18,6 @@ import (
 
 const (
 	defaultModel = "gemma3:12b"
-
-	reasoningStartTag = "<think>"
-	reasoningEndTag   = "</think>"
 )
 
 // generation parameter constants
@@ -143,6 +140,7 @@ func doGeneration(
 			return 1, fmt.Errorf("invalid output JSON scheme: `%s`", *p.Generation.OutputJSONScheme)
 		}
 	}
+	req.Think = ptr(p.Generation.WithThinking)
 
 	logVerbose(verboseMaximum, vbs, "with generation request: %v", prettify(req))
 
@@ -154,7 +152,7 @@ func doGeneration(
 	ch := make(chan result, 1)
 	go func() {
 		endsWithNewLine := false
-		reasoning := false
+		reasoningStarted := false
 		firstContentAfterReasoning := false
 
 		if err = client.Chat(
@@ -162,20 +160,35 @@ func doGeneration(
 			req,
 			func(resp api.ChatResponse) error {
 				if resp.Message.Role == "assistant" {
-					if len(resp.Message.Content) > 0 {
-						// handle the beginning of reasoning
-						if strings.Contains(resp.Message.Content, reasoningStartTag) {
-							logVerbose(
-								verboseMedium,
-								vbs,
-								"reasoning...",
-							)
+					// handle the beginning and end of reasoning
+					if len(resp.Message.Thinking) > 0 {
+						if !reasoningStarted {
+							if !p.Generation.HideReasoning {
+								fmt.Printf("<think>\n")
+							}
 
-							reasoning = true
+							reasoningStarted = true
 						}
+					} else {
+						if reasoningStarted {
+							if !p.Generation.HideReasoning {
+								fmt.Printf("</think>\n")
+							}
 
+							reasoningStarted = false
+							firstContentAfterReasoning = true
+						}
+					}
+
+					// show thinking
+					if !p.Generation.HideReasoning && len(resp.Message.Thinking) > 0 {
+						fmt.Printf("%s", resp.Message.Thinking)
+					}
+
+					// handle generated things
+					if len(resp.Message.Content) > 0 {
 						// print the generated content
-						if !p.Generation.HideReasoning || !reasoning {
+						if !p.Generation.HideReasoning || !reasoningStarted {
 							content := resp.Message.Content
 
 							// trim the first content after reasoning for removing unwanted newlines
@@ -187,28 +200,30 @@ func doGeneration(
 							fmt.Print(content)
 							endsWithNewLine = strings.HasSuffix(content, "\n")
 						}
-
-						// handle the end of reasoning
-						if strings.Contains(resp.Message.Content, reasoningEndTag) {
-							logVerbose(
-								verboseMedium,
-								vbs,
-								"reasoning finished",
-							)
-
-							reasoning = false
-							firstContentAfterReasoning = true
-						}
 					} else if len(resp.Message.ToolCalls) > 0 {
+						// TODO: handle tool calls
+
 						logVerbose(
 							verboseMedium,
 							vbs,
 							"generated tool calls:",
 						)
 
-						marshalled, _ := json.MarshalIndent(resp.Message.ToolCalls, "", "  ")
-
+						marshalled, _ := json.MarshalIndent(
+							resp.Message.ToolCalls,
+							"",
+							"  ",
+						)
 						fmt.Printf("%s\n", string(marshalled))
+					} else if len(resp.Message.Images) > 0 {
+						// TODO: handle images
+
+						logVerbose(
+							verboseMedium,
+							vbs,
+							"generated %d images",
+							len(resp.Message.Images),
+						)
 					}
 				}
 				if resp.Done {

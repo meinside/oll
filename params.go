@@ -31,6 +31,7 @@ type params struct {
 		ToolConfig       *string `short:"t" long:"tool-config" description:"Tool config for function calling (in JSON format)"`
 		OutputJSONScheme *string `short:"j" long:"json" description:"Output result as this JSON scheme"`
 
+		WithThinking  bool `short:"k" long:"with-thinking" description:"Generate with thinking (works only with models which support thinking)"`
 		HideReasoning bool `short:"r" long:"hide-reasoning" description:"Hide reasoning (<think></think>) while streaming the result"`
 	} `group:"Generation"`
 

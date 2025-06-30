@@ -77,6 +77,13 @@ $ curl https://api.coincap.io/v2/assets \
     | oll -p "what's the current price of bitcoin?"
 ```
 
+You can generate with thinking with models which support thinking:
+
+```bash
+$ oll -m "deepseek-r1:8b" -p "what is the earth escape velocity?" --with-thinking
+$ oll -m "deepseek-r1:8b" -p "what is the three laws of newton?" --with-thinking --hide-reasoning
+```
+
 ### Function Call / JSON Output
 
 You can use function call with supported models:
