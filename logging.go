@@ -68,11 +68,11 @@ func logError(format string, v ...any) {
 		format += "\n"
 	}
 
-	if supportscolor.Stdout().SupportsColor { // if color is supported,
+	if supportscolor.Stderr().SupportsColor { // if color is supported,
 		c := color.New(color.FgRed)
-		_, _ = c.Printf(format, v...)
+		_, _ = c.Fprintf(os.Stderr, format, v...)
 	} else {
-		fmt.Printf(format, v...)
+		fmt.Fprintf(os.Stderr, format, v...)
 	}
 }
 
