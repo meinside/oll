@@ -76,7 +76,7 @@ func logError(format string, v ...any) {
 	}
 }
 
-// print logVerbose message
+// print verbose message
 //
 // (only when the level of given `verbosityFromParams` is greater or equal to `targetLevel`)
 func logVerbose(targetLevel verbosity, verbosityFromParams []bool, format string, v ...any) {
@@ -85,6 +85,13 @@ func logVerbose(targetLevel verbosity, verbosityFromParams []bool, format string
 
 		logMessage(targetLevel, format, v...)
 	}
+}
+
+// print warning message
+func warn(format string, v ...any) {
+	format = fmt.Sprintf("[WARN] %s", format)
+
+	logError(format, v...)
 }
 
 // print help message before os.Exit()
@@ -104,9 +111,15 @@ func printErrorBeforeExit(code int, format string, a ...any) (exit int) {
 }
 
 // prettify given thing in JSON format
-func prettify(v any) string {
-	if bytes, err := json.MarshalIndent(v, "", "  "); err == nil {
-		return string(bytes)
+func prettify(v any, flatten ...bool) string {
+	if len(flatten) > 0 && flatten[0] {
+		if bytes, err := json.Marshal(v); err == nil {
+			return string(bytes)
+		}
+	} else {
+		if bytes, err := json.MarshalIndent(v, "", "  "); err == nil {
+			return string(bytes)
+		}
 	}
 	return fmt.Sprintf("%+v", v)
 }

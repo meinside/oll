@@ -4,12 +4,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/jessevdk/go-flags"
+	"github.com/meinside/smithery-go"
 	"github.com/meinside/version-go"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/ollama/ollama/api"
 )
 
 const (
@@ -37,7 +41,10 @@ Respond to user messages according to the following principles:
 func run(parser *flags.Parser, p params) (exitCode int, err error) {
 	// early return if no task was requested
 	if !p.taskRequested() {
-		logMessage(verboseMedium, "No task was requested.")
+		logMessage(
+			verboseMedium,
+			"No task was requested.",
+		)
 
 		return printHelpBeforeExit(1, parser), nil
 	}
@@ -88,20 +95,134 @@ func run(parser *flags.Parser, p params) (exitCode int, err error) {
 
 	if p.hasPrompt() { // if prompt is given,
 		if p.Embeddings.GenerateEmbeddings {
-			logVerbose(verboseMaximum, p.Verbose, "embeddings request params with prompt: %s\n\n", prettify(p))
+			logVerbose(
+				verboseMaximum,
+				p.Verbose,
+				"embeddings request params with prompt: %s\n\n",
+				prettify(p),
+			)
 
 			return doEmbeddingsGeneration(context.TODO(), conf, p)
 		} else {
-			logVerbose(verboseMaximum, p.Verbose, "generation request params with prompt: %s\n\n", prettify(p))
+			logVerbose(
+				verboseMaximum,
+				p.Verbose,
+				"generation request params with prompt: %s\n\n",
+				prettify(p),
+			)
 
-			return doGeneration(context.TODO(), conf, p)
+			// tools (local) and callbacks
+			var localTools []api.Tool = nil
+			if p.LocalTools.Tools != nil {
+				if bytes, err := standardizeJSON([]byte(*p.LocalTools.Tools)); err != nil {
+					return 1, fmt.Errorf("failed to standardize json for local tool: %w", err)
+				} else {
+					if err := json.Unmarshal(bytes, &localTools); err != nil {
+						return 1, fmt.Errorf("failed to unmarshal local tool: %w", err)
+					}
+				}
+			}
+
+			// tools (smithery)
+			var sc *smithery.Client
+			var allSmitheryTools map[string][]*mcp.Tool = nil
+			if conf.SmitheryAPIKey != nil &&
+				p.SmitheryTools.SmitheryProfileID != nil &&
+				len(p.SmitheryTools.SmitheryServerNames) > 0 {
+				sc = newSmitheryClient(*conf.SmitheryAPIKey)
+
+				for _, smitheryServerName := range p.SmitheryTools.SmitheryServerNames {
+					logVerbose(
+						verboseMedium,
+						p.Verbose,
+						"fetching tools for '%s' from smithery...",
+						smitheryServerName,
+					)
+
+					var fetchedSmitheryTools []*mcp.Tool
+					if fetchedSmitheryTools, err = fetchSmitheryTools(
+						context.TODO(),
+						sc,
+						*p.SmitheryTools.SmitheryProfileID,
+						smitheryServerName,
+					); err == nil {
+						if allSmitheryTools == nil {
+							allSmitheryTools = map[string][]*mcp.Tool{}
+						}
+						allSmitheryTools[smitheryServerName] = fetchedSmitheryTools
+
+						// check if there is any duplicated name of function
+						if value, duplicated := duplicated(
+							keysFromTools(localTools, allSmitheryTools),
+						); duplicated {
+							return 1, fmt.Errorf(
+								"duplicated function name in tools: '%s'",
+								value,
+							)
+						}
+					} else {
+						return 1, fmt.Errorf(
+							"failed to fetch tools from smithery: %w",
+							err,
+						)
+					}
+				}
+			} else if p.SmitheryTools.SmitheryProfileID != nil || len(p.SmitheryTools.SmitheryServerNames) > 0 {
+				if conf.SmitheryAPIKey == nil {
+					warn(
+						"Smithery API key is not set in the config file, so ignoring it for now.",
+					)
+				} else {
+					warn(
+						"Both profile id and server name is needed for using Smithery, so ignoring them for now.",
+					)
+				}
+			}
+
+			return doGeneration(
+				context.TODO(),
+				conf,
+				*p.Model,
+				*p.Generation.SystemInstruction,
+				p.Generation.Temperature,
+				p.Generation.TopP,
+				p.Generation.TopK,
+				p.Generation.Stop,
+				p.Generation.OutputJSONScheme,
+				p.Generation.WithThinking,
+				p.Generation.HideReasoning,
+				p.ContextWindowSize,
+				*p.Generation.Prompt,
+				p.Generation.Filepaths,
+				p.Tools.ShowCallbackResults,
+				p.Tools.RecurseOnCallbackResults,
+				localTools,
+				p.LocalTools.ToolCallbacks,
+				p.LocalTools.ToolCallbacksConfirm,
+				conf.SmitheryAPIKey,
+				sc,
+				p.SmitheryTools.SmitheryProfileID,
+				allSmitheryTools,
+				nil,
+				p.UserAgent,
+				p.ReplaceHTTPURLsInPrompt,
+				p.Verbose,
+			)
 		}
 	} else if p.ListModels {
 		return doListModels(context.TODO(), conf, p)
 	} else { // otherwise,
-		logVerbose(verboseMaximum, p.Verbose, "falling back with params: %s\n\n", prettify(p))
+		logVerbose(
+			verboseMaximum,
+			p.Verbose,
+			"falling back with params: %s\n\n",
+			prettify(p),
+		)
 
-		logMessage(verboseMedium, "Parameter error: no task was requested or handled properly.")
+		logMessage(
+			verboseMedium,
+			"Parameter error: no task was requested or handled properly.",
+		)
 
 		return printHelpBeforeExit(1, parser), nil
 	}

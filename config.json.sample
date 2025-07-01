@@ -9,4 +9,6 @@
   // network timeout seconds (for fetching urls, and/or generating responses)
   //"timeout_seconds": 300,
   //"replace_http_url_timeout_seconds": 10,
+
+  //"smithery_api_key": "your-smithery-api-key-here",
 }

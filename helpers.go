@@ -5,11 +5,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -18,6 +21,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ollama/ollama/api"
 	"github.com/tailscale/hujson"
 )
@@ -193,14 +197,15 @@ func expandFilepaths(p params) (expanded []*string, err error) {
 	return filtered, nil
 }
 
-// replace all HTTP URLs in `p.Prompt` to the content of each URL.
+// replace all HTTP URLs in `prompt` to the content of each URL.
 //
 // files that were not converted to text will be returned as `files`.
-func replaceURLsInPrompt(conf config, p params) (replaced string, files map[string][]byte) {
-	userAgent := *p.UserAgent
-	prompt := *p.Generation.Prompt
-	vbs := p.Verbose
-
+func replaceURLsInPrompt(
+	conf config,
+	userAgent *string,
+	prompt string,
+	vbs []bool,
+) (replaced string, files map[string][]byte) {
 	files = map[string][]byte{}
 
 	re := regexp.MustCompile(urlRegexp)
@@ -231,7 +236,7 @@ func replaceURLsInPrompt(conf config, p params) (replaced string, files map[stri
 }
 
 // fetch the content from given url and convert it to text for prompting.
-func fetchContent(timeoutSeconds int, userAgent, url string, vbs []bool) (converted []byte, contentType string, err error) {
+func fetchContent(timeoutSeconds int, userAgent *string, url string, vbs []bool) (converted []byte, contentType string, err error) {
 	client := &http.Client{
 		Timeout: time.Duration(timeoutSeconds) * time.Second,
 	}
@@ -242,7 +247,11 @@ func fetchContent(timeoutSeconds int, userAgent, url string, vbs []bool) (conver
 	if err != nil {
 		return nil, contentType, fmt.Errorf("failed to create http request: %w", err)
 	}
-	req.Header.Set("User-Agent", userAgent)
+	if userAgent != nil {
+		req.Header.Set("User-Agent", *userAgent)
+	} else {
+		req.Header.Set("User-Agent", defaultUserAgent)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -431,6 +440,7 @@ func supportedImage(data []byte) (supported bool, err error) {
 	return false, err
 }
 
+// detect and return whether given path is an image
 func supportedImagePath(filepath string) (supported bool, err error) {
 	var f *os.File
 	if f, err = os.Open(filepath); err == nil {
@@ -612,4 +622,171 @@ func ChunkText(text string, opts ...TextChunkOption) (ChunkedText, error) {
 		Original: text,
 		Chunks:   chunks,
 	}, nil
+}
+
+// expand given path
+func expandPath(path string) string {
+	// handle `~/*`,
+	if strings.HasPrefix(path, "~/") {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			path = strings.Replace(
+				path,
+				"~",
+				homeDir,
+				1,
+			)
+		}
+	}
+
+	// expand environment variables, eg. $HOME
+	path = os.ExpandEnv(path)
+
+	// clean,
+	path = filepath.Clean(path)
+
+	return path
+}
+
+// run executable with given args and return its result
+func runExecutable(
+	execPath string,
+	args map[string]any,
+) (result string, err error) {
+	execPath = expandPath(execPath)
+
+	// marshal args
+	var paramArgs []byte
+	paramArgs, err = json.Marshal(args)
+	if err != nil {
+		return "", fmt.Errorf(
+			"failed to marshal args: %w",
+			err,
+		)
+	}
+
+	// and run
+	arg := string(paramArgs)
+	cmd := exec.Command(execPath, arg)
+	var output []byte
+	output, err = cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf(
+			"failed to run '%s' with args %s: %w",
+			execPath,
+			arg,
+			err,
+		)
+	}
+
+	return string(output), nil
+}
+
+// confirm with the given prompt (y/n)
+func confirm(prompt string) bool {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Printf("%s (y/N): ", prompt)
+
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Fprintln(
+				os.Stderr,
+				"Error reading input:",
+				err,
+			)
+			continue
+		}
+		response = strings.ToLower(strings.TrimSpace(response))
+		if strings.HasPrefix(response, "y") {
+			return true
+		} else {
+			return false
+		}
+	}
+}
+
+// read user input from stdin
+func readFromStdin(prompt string) (string, error) {
+	fmt.Printf("%s: ", prompt)
+	reader := bufio.NewReader(os.Stdin)
+	return reader.ReadString('\n')
+}
+
+// check if there is any duplicated value between given arrays
+func duplicated[V comparable](arrs ...[]V) (value V, duplicated bool) {
+	pool := map[V]struct{}{}
+	for _, arr := range arrs {
+		for _, v := range arr {
+			if _, exists := pool[v]; exists {
+				return v, true
+			}
+			pool[v] = struct{}{}
+		}
+	}
+	var zero V
+	return zero, false
+}
+
+// extract keys from given tools
+func keysFromTools(
+	localTools []api.Tool,
+	smitheryTools map[string][]*mcp.Tool,
+) (localToolKeys, smitheryToolKeys []string) {
+	for _, tool := range localTools {
+		localToolKeys = append(localToolKeys, tool.Function.Name)
+	}
+	for _, tools := range smitheryTools {
+		for _, tool := range tools {
+			smitheryToolKeys = append(smitheryToolKeys, tool.Name)
+		}
+	}
+
+	return
+}
+
+// check if the past generations end with users's message,
+func historyEndsWithUsers(history []api.Message) bool {
+	if len(history) > 0 {
+		last := history[len(history)-1]
+
+		return last.Role == "user"
+	}
+	return false
+}
+
+// append a user message to the past generations
+func appendUserMessageToPastGenerations(
+	history []api.Message,
+	message string,
+) []api.Message {
+	return append(history, api.Message{
+		Role:    "user",
+		Content: message,
+	})
+}
+
+// append a model response to the past generations
+func appendModelResponseToPastGenerations(
+	history []api.Message,
+	generated string,
+) []api.Message {
+	if len(history) > 0 {
+		last := history[len(history)-1]
+		if last.Role == "assistant" {
+			last.Content += generated
+		} else {
+			history = append(history, api.Message{
+				Role:    "assistant",
+				Content: generated,
+			})
+		}
+	} else {
+		return []api.Message{
+			{
+				Role:    "assistant",
+				Content: generated,
+			},
+		}
+	}
+	return history
 }

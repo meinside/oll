@@ -19,21 +19,41 @@ type params struct {
 	//
 	// https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
 	Generation struct {
+		// prompt, system instruction, and other things for generation
 		Prompt            *string   `short:"p" long:"prompt" description:"Prompt for generation (can also be read from stdin)"`
 		Filepaths         []*string `short:"f" long:"filepath" description:"Path of a file or directory (can be used multiple times)"`
 		SystemInstruction *string   `short:"s" long:"system" description:"System instruction (can be omitted)"`
+		Temperature       *float32  `long:"temperature" description:"'temperature' for generation (default: 1.0)"`
+		TopP              *float32  `long:"top-p" description:"'top_p' for generation (default: 0.95)"`
+		TopK              *int32    `long:"top-k" description:"'top_k' for generation (default: 20)"`
+		Stop              []*string `long:"stop" description:"'stop' sequence string for generation (can be used multiple times)"`
 
-		Temperature *float32  `long:"temperature" description:"'temperature' for generation (default: 1.0)"`
-		TopP        *float32  `long:"top-p" description:"'top_p' for generation (default: 0.95)"`
-		TopK        *int32    `long:"top-k" description:"'top_k' for generation (default: 20)"`
-		Stop        []*string `long:"stop" description:"'stop' sequence string for generation (can be used multiple times)"`
-
-		ToolConfig       *string `short:"t" long:"tool-config" description:"Tool config for function calling (in JSON format)"`
+		// other generation options
 		OutputJSONScheme *string `short:"j" long:"json" description:"Output result as this JSON scheme"`
 
+		// thinking
 		WithThinking  bool `short:"k" long:"with-thinking" description:"Generate with thinking (works only with models which support thinking)"`
-		HideReasoning bool `short:"r" long:"hide-reasoning" description:"Hide reasoning (<think></think>) while streaming the result"`
+		HideReasoning bool `short:"H" long:"hide-reasoning" description:"Hide reasoning (<think></think>) while streaming the result"`
 	} `group:"Generation"`
+
+	// tools
+	Tools struct {
+		ShowCallbackResults      bool `long:"show-callback-results" description:"Whether to force print the results of tool callbacks (default: only in verbose mode)"`
+		RecurseOnCallbackResults bool `short:"r" long:"recurse-on-callback-results" description:"Whether to do recursive generations on callback results (default: false)"`
+	} `group:"Tools"`
+
+	// tools (local)
+	LocalTools struct {
+		Tools                *string           `short:"t" long:"tools" description:"Tools for function call (in JSON)"`
+		ToolCallbacks        map[string]string `long:"tool-callbacks" description:"Tool callbacks (can be used multiple times, eg. 'fn_name1:/path/to/script1.sh', 'fn_name2:/path/to/script2.sh')"`
+		ToolCallbacksConfirm map[string]bool   `long:"tool-callbacks-confirm" description:"Confirm before executing tool callbacks (can be used multiple times, eg. 'fn_name1:true', 'fn_name2:false')"`
+	} `group:"Tools (Local)"`
+
+	// tools (smithery)
+	SmitheryTools struct {
+		SmitheryProfileID   *string  `long:"smithery-profile-id" description:"Smithery profile ID for function call"`
+		SmitheryServerNames []string `long:"smithery-server-name" description:"Smithery qualified server name for function call (can be used multiple times)"`
+	} `group:"Tools (Smithery)"`
 
 	// list models
 	//
@@ -66,6 +86,7 @@ func (p *params) hasPrompt() bool {
 }
 
 // check if any task is requested
+//
 // FIXME: TODO: need to be fixed whenever a new task is added
 func (p *params) taskRequested() bool {
 	return p.hasPrompt() ||
@@ -75,6 +96,7 @@ func (p *params) taskRequested() bool {
 }
 
 // check if multiple tasks are requested
+//
 // FIXME: TODO: need to be fixed whenever a new task is added
 func (p *params) multipleTaskRequested() bool {
 	hasPrompt := p.hasPrompt()

@@ -77,22 +77,42 @@ $ curl https://api.coincap.io/v2/assets \
     | oll -p "what's the current price of bitcoin?"
 ```
 
-You can generate with thinking with models which support thinking:
+You can generate with thinking with [models which support thinking](https://ollama.com/search?c=thinking):
 
 ```bash
 $ oll -m "deepseek-r1:8b" -p "what is the earth escape velocity?" --with-thinking
 $ oll -m "deepseek-r1:8b" -p "what is the three laws of newton?" --with-thinking --hide-reasoning
 ```
 
-### Function Call / JSON Output
+### JSON Output
 
-You can use function call with supported models:
+Print generated result as JSON with `-j` or `--json`:
+
+```bash
+$ oll -p "what is the current time and timezone?" \
+    -j '{
+  "type":"object",
+  "properties":{
+    "time":{
+      "type":"string"
+    },
+    "timezone":{
+      "type": "string"
+    }
+  },
+  "required": ["time", "timezone"]
+}'
+```
+
+### Function Call (Local)
+
+You can use function call with [supported models](https://ollama.com/search?c=tools):
 (NOTE: some models may not support tools)
 
 ```bash
 # output tool calls as JSON
-$ oll -m "qwen2.5:1.5b" -p "add 42 to 43" \
-    -t '[
+$ oll -m "qwen3:8b" -p "add 42 to 43" \
+    --tools '[
   {
     "type":"function",
     "function":{
@@ -117,21 +137,291 @@ $ oll -m "qwen2.5:1.5b" -p "add 42 to 43" \
 ]'
 ```
 
+#### Execute Callbacks on Function Calls
+
+With `--tool-callbacks`, it will run matched scripts/binaries with the function call data.
+
+Here is a sample bash script `categorize_image.sh` which categorizes given image with function call:
+
 ```bash
-# output generated result as JSON
-$ oll -p "what is the current time and timezone?" \
-    -j '{
-  "type":"object",
-  "properties":{
-    "time":{
-      "type":"string"
-    },
-    "timezone":{
-      "type": "string"
+#!/usr/bin/env bash
+#
+# categorize_image.sh
+
+CALLBACK_SCRIPT="/path/to/callback_categorize_image.sh"
+
+# read filename from args
+filename="$*"
+
+# tools
+read -r -d '' TOOLS <<-'EOF'
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "categorize_image",
+      "description": "this function categorizes the provided image",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "category": {
+            "type": "STRING",
+            "description": "the category of the provided image",
+            "enum": ["animal", "person", "scenary", "object", "other"],
+            "nullable": false
+          },
+          "description": {
+            "type": "STRING",
+            "description": "the detailed description of the provided image",
+            "nullable": false
+          }
+        },
+        "required": ["category", "description"]
+      }
     }
-  },
-  "required": ["time", "timezone"]
-}'
+  }
+]
+EOF
+
+# run oll with params (drop error/warning messages)
+oll -m "mistral-small3.2:24b" -f "$filename" -p "categorize this image" \
+  --tools="$TOOLS" \
+  --tool-callbacks="categorize_image:$CALLBACK_SCRIPT" \
+  --show-callback-results 2>/dev/null
+```
+
+And this is a callback script `callback_categorize_image.sh`:
+
+```bash
+#!/usr/bin/env bash
+#
+# callback_categorize_image.sh
+
+# args (in JSON)
+data="$*"
+
+# read args with jq
+result=$(echo "$data" |
+  jq -r '. | "Category: \(.category)\nDescription: \(.description)"')
+
+# print to stdout
+echo "$result"
+```
+
+Run `categorize_image.sh` with an image file:
+
+```bash
+$ ./categorize_image.sh /path/to/some_image.jpg
+```
+
+then it will print the desired result:
+
+```bash
+Category: scenary
+Description: a group of people walking on the street in a city
+```
+
+#### Confirm before Executing Callbacks
+
+With `--tool-callbacks-confirm`, it will ask for confirmation before executing the scripts/binaries:
+
+```bash
+$ oll -m "qwen3:8b" -p "nuke the root directory" \
+    --tools='[{
+        "type": "function",
+        "function": {
+            "name": "remove_dir_recursively",
+            "description": "this function deletes given directory recursively", 
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {"directory": {"type": "STRING"}},
+                "required": ["directory"]
+            }
+        }
+    }]' \
+    --tool-callbacks="remove_dir_recursively:/path/to/rm_rf_dir.sh" \
+    --tool-callbacks-confirm="remove_dir_recursively:true" \
+    --recurse-on-callback-results
+```
+
+#### Generate Recursively with Callback Results
+
+With `--recurse-on-callback-results` / `-r`, it will generate recursively with the results of the scripts/binaries:
+
+```bash
+$ oll -m "qwen3:8b" -p "what is the smallest .sh file in /home/ubuntu/tmp/ and how many lines does that file have" \
+    --tools='[
+    {
+        "type": "function",
+        "function": {
+            "name": "list_files_info_in_dir",
+            "description": "this function lists information of files in a directory",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "directory": {"type": "STRING", "description": "an absolute path of a directory"}
+                },
+                "required": ["directory"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "count_lines_of_file",
+            "description": "this function counts the number of lines in a file", 
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "directory": {"type": "STRING", "description": "an absolute path of a directory"},
+                    "filename": {"type": "STRING"}
+                },
+                "required": ["directory", "filename"]
+            }
+        }
+    }]' \
+    --tool-callbacks="list_files_info_in_dir:/path/to/list_files_info_in_dir.sh" \
+    --tool-callbacks="count_lines_of_file:/path/to/count_lines_of_file.sh" \
+    --recurse-on-callback-results
+```
+
+Note that the mode of function calling config here is set to `AUTO`. If it is `ANY`, it may loop infinitely on the same function call result.
+
+You can omit `--recurse-on-callback-results` / `-r` if you don't need it, but then it will just print the first function call result and exit.
+
+#### Generate with Predefined Callbacks
+
+You can set predefined callbacks for tool callbacks instead of scripts/binaries.
+
+Here are predefined callback names:
+
+* `@stdin`: Ask the user for standard input.
+* `@format`: Print a formatted string with the resulting function arguments.
+* … (more to be added)
+
+##### @stdin
+
+```bash
+$ oll -m "qwen3:8b" -p "send an email to steve that i'm still alive (ask me if you don't know steve's email address)" \
+    --tools='[
+        {
+            "type": "function",
+            "function": {
+                "name": "send_email",
+                "description": "this function sends an email with given values",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "email_address": {"type": "STRING", "description": "email address of the recipient"},
+                        "email_title": {"type": "STRING", "description": "email title"},
+                        "email_body": {"type": "STRING", "description": "email body"}
+                    },
+                    "required": ["email_address", "email_title", "email_body"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "ask_email_address",
+                "description": "this function asks for the email address of recipient"
+            }
+        }
+    ]' \
+    --tool-callbacks="send_email:/path/to/send_email.sh" \
+    --tool-callbacks="ask_email_address:@stdin" \
+    --recurse-on-callback-results
+```
+
+##### @format
+
+With `--tool-callbacks="YOUR_CALLBACK:@format=YOUR_FORMAT_STRING"`, it will print the resulting function arguments as a string formatted with the [text/template](https://pkg.go.dev/text/template) syntax:
+
+```bash
+$ oll -m "mistral-small3.2:24b" -f /some/image/file.jpg -p "categorize this image" \
+    --tools='[{
+        "type": "function",
+        "function": {
+            "name": "categorize_image",
+            "description": "this function categorizes the provided image",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "category": {
+                        "type": "STRING",
+                        "description": "the category of the provided image",
+                        "enum": ["animal", "person", "scenary", "object", "other"],
+                        "nullable": false
+                    },
+                    "description": {
+                        "type": "STRING",
+                        "description": "the detailed description of the provided image",
+                        "nullable": false
+                    }
+                },
+                "required": ["category", "description"]
+            }
+        }}]' \
+    --tool-callbacks='categorize_image:@format={{printf "Category: %s\nDescription: %s\n" .category .description}}' \
+    --show-callback-results 2>/dev/null
+```
+
+When the format string is omitted (`--tool-callbacks="YOUR_CALLBACK:@format"`), it will be printed as a JSON string.
+
+### Function Call with MCP: Smithery
+
+Put your Smithery API key in your `config.json`,
+
+```json
+{
+  "smithery_api_key": "YOUR_SMITHERY_API_KEY",
+}
+```
+
+then call with your smithery profile id and desired server name like:
+
+```bash
+$ oll -m "qwen3:8b" -p "what is shoebill? search from the web" \
+    --smithery-profile-id="your-smithery-profile-id" \
+    --smithery-server-name="@nickclyde/duckduckgo-mcp-server" \
+    --recurse-on-callback-results
+```
+
+You can use `--smithery-server-name` multiple times for using multiple servers' functions:
+
+```bash
+$ oll -m "qwen3:8b" \
+    -p "1. get any one github repository of @meinside. 2. search for the repository's name from duckduckgo. 3. then summarize the searched results" \
+    --smithery-profile-id="your-smithery-profile-id" \
+    --smithery-server-name="@nickclyde/duckduckgo-mcp-server" \
+    --smithery-server-name="@smithery-ai/github" \
+    --recurse-on-callback-results
+```
+
+You can even mix local tools and Smithery:
+
+```bash
+$ oll -m "qwen3:8b" -p "summarize the latest commits of repository 'oll' of github user @meinside (branch: master) and send them as an email to asdf@zxcv.net" \
+    --smithery-profile-id="your-smithery-profile-id" \
+    --smithery-server-name="@smithery-ai/github" \
+    --tools='[{
+        "type": "function",
+        "function":{
+            "name": "send_email",
+            "description": "this function sends an email with given values",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {
+                    "email_address": {"type": "STRING", "description": "email address of the recipient"},
+                    "email_title": {"type": "STRING", "description": "email title"},
+                    "email_body": {"type": "STRING", "description": "email body"}
+                },
+                "required": ["email_address", "email_title", "email_body"]
+            }
+        }
+    }]' \
+    --tool-callbacks="send_email:/path/to/send_email.sh" \
+    --recurse-on-callback-results
 ```
 
 ### Fetch URL Contents from the Prompt
