@@ -25,7 +25,7 @@ with following content:
 
 ```json
 {
-  "default_model": "deepseek-r1",
+  "default_model": "mistral-small3.2:24b",
 
   "timeout_seconds": 300,
   "replace_http_url_timeout_seconds": 10
@@ -80,8 +80,8 @@ $ curl https://api.coincap.io/v2/assets \
 You can generate with thinking with [models which support thinking](https://ollama.com/search?c=thinking):
 
 ```bash
-$ oll -m "deepseek-r1:8b" -p "what is the earth escape velocity?" --with-thinking
-$ oll -m "deepseek-r1:8b" -p "what is the three laws of newton?" --with-thinking --hide-reasoning
+$ oll -m "qwen3:8b" -p "what is the earth escape velocity?" --with-thinking
+$ oll -m "qwen3:8b" -p "what is the three laws of newton?" --with-thinking --hide-reasoning
 ```
 
 ### JSON Output
@@ -111,7 +111,8 @@ You can use function call with [supported models](https://ollama.com/search?c=to
 
 ```bash
 # output tool calls as JSON
-$ oll -m "qwen3:8b" -p "add 42 to 43" \
+$ oll -m "mistral-small3.2:24b" \
+    -p "add 42 to 43" \
     --tools '[
   {
     "type":"function",
@@ -184,10 +185,12 @@ read -r -d '' TOOLS <<-'EOF'
 EOF
 
 # run oll with params (drop error/warning messages)
-oll -m "mistral-small3.2:24b" -f "$filename" -p "categorize this image" \
-  --tools="$TOOLS" \
-  --tool-callbacks="categorize_image:$CALLBACK_SCRIPT" \
-  --show-callback-results 2>/dev/null
+oll -m "mistral-small3.2:24b" \
+    -p "categorize this image" \
+    -f "$filename" \
+    --tools="$TOOLS" \
+    --tool-callbacks="categorize_image:$CALLBACK_SCRIPT" \
+    --show-callback-results 2>/dev/null
 ```
 
 And this is a callback script `callback_categorize_image.sh`:
@@ -226,7 +229,8 @@ Description: a group of people walking on the street in a city
 With `--tool-callbacks-confirm`, it will ask for confirmation before executing the scripts/binaries:
 
 ```bash
-$ oll -m "qwen3:8b" -p "nuke the root directory" \
+$ oll -m "mistral-small3.2:24b" \
+    -p "nuke the tmp directory" \
     --tools='[{
         "type": "function",
         "function": {
@@ -249,7 +253,8 @@ $ oll -m "qwen3:8b" -p "nuke the root directory" \
 With `--recurse-on-callback-results` / `-r`, it will generate recursively with the results of the scripts/binaries:
 
 ```bash
-$ oll -m "qwen3:8b" -p "what is the smallest .sh file in /home/ubuntu/tmp/ and how many lines does that file have" \
+$ oll -m "mistral-small3.2:24b" \
+    -p "what is the smallest .sh file in /home/ubuntu/tmp/ and how many lines does that file have" \
     --tools='[
     {
         "type": "function",
@@ -302,7 +307,8 @@ Here are predefined callback names:
 ##### @stdin
 
 ```bash
-$ oll -m "qwen3:8b" -p "send an email to steve that i'm still alive (ask me if you don't know steve's email address)" \
+$ oll -m "mistral-small3.2:24b" \
+    -p "send an email to steve that i'm still alive (ask me if you don't know steve's email address)" \
     --tools='[
         {
             "type": "function",
@@ -338,7 +344,9 @@ $ oll -m "qwen3:8b" -p "send an email to steve that i'm still alive (ask me if y
 With `--tool-callbacks="YOUR_CALLBACK:@format=YOUR_FORMAT_STRING"`, it will print the resulting function arguments as a string formatted with the [text/template](https://pkg.go.dev/text/template) syntax:
 
 ```bash
-$ oll -m "mistral-small3.2:24b" -f /some/image/file.jpg -p "categorize this image" \
+$ oll -m "mistral-small3.2:24b" \
+    -p "categorize this image" \
+    -f /some/image/file.jpg \
     --tools='[{
         "type": "function",
         "function": {
@@ -381,19 +389,22 @@ Put your Smithery API key in your `config.json`,
 then call with your smithery profile id and desired server name like:
 
 ```bash
-$ oll -m "qwen3:8b" -p "what is shoebill? search from the web" \
+$ oll -m "mistral-small3.2:24b" \
+    -p "what is shoebill? search from the web" \
     --smithery-profile-id="your-smithery-profile-id" \
-    --smithery-server-name="@nickclyde/duckduckgo-mcp-server" \
+    --smithery-server-name="exa" \
     --recurse-on-callback-results
 ```
 
 You can use `--smithery-server-name` multiple times for using multiple servers' functions:
 
 ```bash
-$ oll -m "qwen3:8b" \
-    -p "1. get any one github repository of @meinside. 2. search for the repository's name from duckduckgo. 3. then summarize the searched results" \
+$ oll -m "mistral-small3.2:24b" \
+    -p '1. get any one github repository of @meinside
+2. search for the respository name from web
+3. then summarize the searched results' \
     --smithery-profile-id="your-smithery-profile-id" \
-    --smithery-server-name="@nickclyde/duckduckgo-mcp-server" \
+    --smithery-server-name="exa" \
     --smithery-server-name="@smithery-ai/github" \
     --recurse-on-callback-results
 ```
@@ -401,7 +412,8 @@ $ oll -m "qwen3:8b" \
 You can even mix local tools and Smithery:
 
 ```bash
-$ oll -m "qwen3:8b" -p "summarize the latest commits of repository 'oll' of github user @meinside (branch: master) and send them as an email to asdf@zxcv.net" \
+$ oll -m "mistral-small3.2:24b" \
+    -p "summarize the latest commits of repository 'oll' of github user @meinside (branch: master) and send them as an email to asdf@zxcv.net" \
     --smithery-profile-id="your-smithery-profile-id" \
     --smithery-server-name="@smithery-ai/github" \
     --tools='[{
@@ -435,7 +447,9 @@ Supported content types are:
 
 ```bash
 # generate with a text prompt which includes some urls in it 
-$ oll -x -p "what's the latest book of douglas adams? check from here: https://openlibrary.org/search/authors.json?q=douglas%20adams" # NOTE: there might be a warning: "truncating input prompt"
+$ oll -x \
+    -p "what's the latest book of douglas adams? check from here: https://openlibrary.org/search/authors.json?q=douglas%20adams"
+# NOTE: there might be a warning: "truncating input prompt"
 ```
 
 ### Generation with Multimodal Models
@@ -444,7 +458,9 @@ You can use [vision models](https://ollama.com/search?c=vision) with `-m` or `--
 
 ```bash
 # generate with a multimodal model and image file(s)
-$ oll -m gemma3:12b -f ~/Downloads/some_image.png -p "what is this picture?"
+$ oll -m gemma3:12b \
+    -p "what is this picture?" \
+    -f ~/Downloads/some_image.png
 ```
 
 ### Generating Embeddings
@@ -453,7 +469,9 @@ You can print [embeddings](https://ollama.com/search?c=embedding) of a given pro
 
 ```bash
 # generate with an embedding model
-$ oll -e -m nomic-embed-text -p "this is an apple"
+$ oll -e \
+    -m nomic-embed-text \
+    -p "this is an apple"
 ```
 
 ### Others
