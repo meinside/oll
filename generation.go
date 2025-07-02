@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	defaultModel = "gemma3:12b"
+	// https://ollama.com/library/mistral-small3.2
+	defaultModel = "mistral-small3.2:24b" // NOTE: picked a model which supports both tooling and vision for convenience
 )
 
 // generation parameter constants
