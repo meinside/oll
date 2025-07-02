@@ -23,7 +23,9 @@ type config struct {
 }
 
 // read config from given filepath
-func readConfig(configFilepath string) (conf config, err error) {
+func readConfig(
+	configFilepath string,
+) (conf config, err error) {
 	var bytes []byte
 
 	bytes, err = os.ReadFile(configFilepath)
@@ -47,7 +49,9 @@ func readConfig(configFilepath string) (conf config, err error) {
 }
 
 // resolve config filepath
-func resolveConfigFilepath(configFilepath *string) string {
+func resolveConfigFilepath(
+	configFilepath *string,
+) string {
 	if configFilepath != nil {
 		return *configFilepath
 	}

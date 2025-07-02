@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/fatih/color"
 	"github.com/meinside/smithery-go"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ollama/ollama/api"
@@ -50,6 +51,7 @@ func newOllamaClient() (*api.Client, error) {
 // https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
 func doGeneration(
 	ctx context.Context,
+	output *outputWriter,
 	conf config,
 	model string,
 	systemInstruction string,
@@ -75,9 +77,16 @@ func doGeneration(
 	replaceHTTPURLsInPrompt bool,
 	vbs []bool,
 ) (exit int, e error) {
-	logVerbose(verboseMedium, vbs, "generating...")
+	output.verbose(
+		verboseMedium,
+		vbs,
+		"generating...",
+	)
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(conf.TimeoutSeconds)*time.Second)
+	ctx, cancel := context.WithTimeout(
+		ctx,
+		time.Duration(conf.TimeoutSeconds)*time.Second,
+	)
 	defer cancel()
 
 	// ollama api client
@@ -88,13 +97,28 @@ func doGeneration(
 
 	filesInPrompt := map[string][]byte{}
 	if replaceHTTPURLsInPrompt {
-		prompt, filesInPrompt = replaceURLsInPrompt(conf, userAgent, prompt, vbs)
+		prompt, filesInPrompt = replaceURLsInPrompt(
+			output,
+			conf,
+			userAgent,
+			prompt,
+			vbs,
+		)
 
-		logVerbose(verboseMedium, vbs, "prompt with urls replaced: '%s'", prompt)
+		output.verbose(
+			verboseMedium,
+			vbs,
+			"prompt with urls replaced: '%s'",
+			prompt,
+		)
 	}
 
 	// convert prompt with/without files
-	prompt, imageFiles, err := convertPromptAndFiles(prompt, filesInPrompt, filepaths)
+	prompt, imageFiles, err := convertPromptAndFiles(
+		prompt,
+		filesInPrompt,
+		filepaths,
+	)
 	if err != nil {
 		return 1, fmt.Errorf("failed to convert prompt and files: %w", err)
 	}
@@ -105,7 +129,13 @@ func doGeneration(
 
 	// TODO: return error when the context length is exceeded
 
-	logVerbose(verboseMaximum, vbs, "with converted prompt: '%s' and image files: %v", strings.TrimSpace(prompt), imageFiles)
+	output.verbose(
+		verboseMaximum,
+		vbs,
+		"with converted prompt: '%s' and image files: %v",
+		strings.TrimSpace(prompt),
+		imageFiles,
+	)
 
 	// generation options
 	req := &api.ChatRequest{
@@ -180,7 +210,12 @@ func doGeneration(
 	// (history)
 	req.Messages = append(req.Messages, pastGenerations...)
 
-	logVerbose(verboseMaximum, vbs, "with generation request: %v", prettify(req))
+	output.verbose(
+		verboseMaximum,
+		vbs,
+		"with generation request: %v",
+		prettify(req),
+	)
 
 	// generate
 	type result struct {
@@ -189,7 +224,6 @@ func doGeneration(
 	}
 	ch := make(chan result, 1)
 	go func() {
-		endsWithNewLine := false
 		reasoningStarted := false
 		firstContentAfterReasoning := false
 
@@ -203,9 +237,14 @@ func doGeneration(
 						if !reasoningStarted {
 							if !hideReasoning {
 								// print generated content
-								fmt.Printf("<think>\n")
-								pastGenerations = appendModelResponseToPastGenerations(pastGenerations, "<think>\n")
-								endsWithNewLine = true
+								output.printColored(
+									color.FgHiGreen,
+									"<think>\n",
+								)
+								pastGenerations = appendModelResponseToPastGenerations(
+									pastGenerations,
+									"<think>\n",
+								)
 							}
 
 							reasoningStarted = true
@@ -214,9 +253,14 @@ func doGeneration(
 						if reasoningStarted {
 							if !hideReasoning {
 								// print generated content
-								fmt.Printf("</think>\n")
-								pastGenerations = appendModelResponseToPastGenerations(pastGenerations, "</think>\n")
-								endsWithNewLine = true
+								output.printColored(
+									color.FgHiGreen,
+									"</think>\n",
+								)
+								pastGenerations = appendModelResponseToPastGenerations(
+									pastGenerations,
+									"</think>\n",
+								)
 							}
 
 							reasoningStarted = false
@@ -227,9 +271,15 @@ func doGeneration(
 					// show thinking
 					if !hideReasoning && len(resp.Message.Thinking) > 0 {
 						// print generated content
-						fmt.Print(resp.Message.Thinking)
-						endsWithNewLine = strings.HasSuffix(resp.Message.Thinking, "\n")
-						pastGenerations = appendModelResponseToPastGenerations(pastGenerations, resp.Message.Thinking)
+						output.printColored(
+							color.FgHiWhite,
+							"%s",
+							resp.Message.Thinking,
+						)
+						pastGenerations = appendModelResponseToPastGenerations(
+							pastGenerations,
+							resp.Message.Thinking,
+						)
 					}
 
 					// handle generated things
@@ -245,9 +295,15 @@ func doGeneration(
 							}
 
 							// print generated content
-							fmt.Print(content)
-							pastGenerations = appendModelResponseToPastGenerations(pastGenerations, content)
-							endsWithNewLine = strings.HasSuffix(content, "\n")
+							output.printColored(
+								color.FgHiWhite,
+								"%s",
+								content,
+							)
+							pastGenerations = appendModelResponseToPastGenerations(
+								pastGenerations,
+								content,
+							)
 						}
 					} else if len(resp.Message.ToolCalls) > 0 {
 						marshalled, _ := json.MarshalIndent(
@@ -256,7 +312,7 @@ func doGeneration(
 							"  ",
 						)
 
-						logVerbose(
+						output.verbose(
 							verboseMedium,
 							vbs,
 							"generated tool calls: %s",
@@ -265,18 +321,23 @@ func doGeneration(
 
 						// call functions
 						for _, call := range resp.Message.ToolCalls {
-							logVerbose(
+							output.verbose(
 								verboseMedium,
 								vbs,
 								"calling callback for tool call: %s",
 								call.Function.Name,
 							)
 
-							fn := fmt.Sprintf("%s(%s)", call.Function.Name, prettify(call.Function.Arguments, true))
+							fn := fmt.Sprintf(
+								"%s(%s)",
+								call.Function.Name,
+								prettify(call.Function.Arguments, true),
+							)
 
 							if callbackPath, exists := localToolCallbacks[call.Function.Name]; exists {
 								// with local tools,
 								fnCallback, okToRun := checkCallbackPath(
+									output,
 									callbackPath,
 									localToolCallbacksConfirm,
 									call.Function,
@@ -284,7 +345,7 @@ func doGeneration(
 								)
 
 								if okToRun {
-									logVerbose(
+									output.verbose(
 										verboseMedium,
 										vbs,
 										"executing callback...",
@@ -296,9 +357,10 @@ func doGeneration(
 											err,
 										)
 									} else {
-										// warn that there are tool callbacks ignored
-										if len(localToolCallbacks) > 0 && !recurseOnCallbackResults {
-											warn(
+										// warn that there are ignored tool callbacks
+										if len(localToolCallbacks) > 0 &&
+											!recurseOnCallbackResults {
+											output.warn(
 												"Not recursing, ignoring the result of '%s'.",
 												fn,
 											)
@@ -307,7 +369,11 @@ func doGeneration(
 										// print the result of execution
 										if showCallbackResults ||
 											verboseLevel(vbs) >= verboseMinimum {
-											fmt.Printf("%s\n", res)
+											output.printColored(
+												color.FgHiCyan,
+												"%s\n",
+												res,
+											)
 										}
 
 										// append function call result
@@ -330,8 +396,15 @@ func doGeneration(
 									)
 
 									// print generated content
-									fmt.Print(skipped)
-									pastGenerations = appendUserMessageToPastGenerations(pastGenerations, skipped)
+									output.printColored(
+										color.FgHiWhite,
+										"%s",
+										skipped,
+									)
+									pastGenerations = appendUserMessageToPastGenerations(
+										pastGenerations,
+										skipped,
+									)
 
 									// append function call result (not called)
 									pastGenerations = append(pastGenerations, api.Message{
@@ -344,7 +417,10 @@ func doGeneration(
 								}
 							} else if smitheryProfileID != nil {
 								// or with smithery,
-								if serverName, _, exists := smitheryToolFrom(smitheryTools, call.Function.Name); exists {
+								if serverName, _, exists := smitheryToolFrom(
+									smitheryTools,
+									call.Function.Name,
+								); exists {
 									// NOTE: avoid infinite loops
 									if slices.ContainsFunc(pastGenerations, func(message api.Message) bool {
 										return strings.Contains(message.Content, fn)
@@ -367,15 +443,18 @@ func doGeneration(
 										// print the result of execution
 										if showCallbackResults ||
 											verboseLevel(vbs) >= verboseMinimum {
-											logMessage(
-												verboseMinimum,
+											output.printColored(
+												color.FgHiCyan,
 												"%s\n",
 												fnResult,
 											)
 										}
 
 										// print generated content
-										pastGenerations = appendUserMessageToPastGenerations(pastGenerations, fnResult)
+										pastGenerations = appendUserMessageToPastGenerations(
+											pastGenerations,
+											fnResult,
+										)
 									} else {
 										return fmt.Errorf("failed to call smithery tool: %w", err)
 									}
@@ -383,34 +462,44 @@ func doGeneration(
 							} else {
 								// print generated content
 								fnUnhandled := fmt.Sprintf("Generated tool call: %s", fn)
-								fmt.Print(fnUnhandled)
-								pastGenerations = appendUserMessageToPastGenerations(pastGenerations, fnUnhandled)
-								endsWithNewLine = false
+								output.printColored(
+									color.FgHiWhite,
+									"%s\n",
+									fnUnhandled,
+								)
+								pastGenerations = appendUserMessageToPastGenerations(
+									pastGenerations,
+									fnUnhandled,
+								)
 							}
 						}
 					} else if len(resp.Message.Images) > 0 {
-						// TODO: handle images
-
-						logVerbose(
+						output.verbose(
 							verboseMedium,
 							vbs,
 							"generated %d images",
 							len(resp.Message.Images),
 						)
 
-						// print generated content
-						fmt.Printf("Generated %d images.\n", len(resp.Message.Images))
-						pastGenerations = appendModelResponseToPastGenerations(pastGenerations, fmt.Sprintf("Generated %d images.", len(resp.Message.Images)))
+						// TODO: handle images
+						handled := fmt.Sprintf("Generated %d images.", len(resp.Message.Images))
+						// FIXME: print generated content
+						output.printColored(
+							color.FgHiWhite,
+							"%s\n",
+							handled,
+						)
+						pastGenerations = appendModelResponseToPastGenerations(
+							pastGenerations,
+							handled,
+						)
 					}
 				}
 				if resp.Done {
-					if !endsWithNewLine {
-						fmt.Println()
-						endsWithNewLine = true
-					}
+					output.makeSureToEndWithNewLine()
 
 					// print the number of tokens
-					logVerbose(
+					output.verbose(
 						verboseMinimum,
 						vbs,
 						"%s done[%s], load: %v, total: %v, prompt eval: %.3f/s, eval: %3f/s",
@@ -450,15 +539,17 @@ func doGeneration(
 			res.err == nil &&
 			recurseOnCallbackResults &&
 			historyEndsWithUsers(pastGenerations) {
-			logVerbose(
+			output.verbose(
 				verboseMedium,
 				vbs,
 				"Generating recursively with history: %s",
 				prettify(pastGenerations),
 			)
 
+			// recurse!
 			return doGeneration(
 				ctx,
+				output,
 				conf,
 				model,
 				systemInstruction,
@@ -497,14 +588,22 @@ func doGeneration(
 // https://github.com/ollama/ollama/blob/main/docs/api.md#list-local-models
 func doListModels(
 	ctx context.Context,
+	output *outputWriter,
 	conf config,
 	p params,
 ) (exit int, e error) {
 	vbs := p.Verbose
 
-	logVerbose(verboseMedium, vbs, "listing models...")
+	output.verbose(
+		verboseMedium,
+		vbs,
+		"listing models...",
+	)
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(conf.TimeoutSeconds)*time.Second)
+	ctx, cancel := context.WithTimeout(
+		ctx,
+		time.Duration(conf.TimeoutSeconds)*time.Second,
+	)
 	defer cancel()
 
 	// ollama api client
@@ -520,17 +619,36 @@ func doListModels(
 	}
 	if len(models.Models) > 0 {
 		// print headers
-		logMessage(verboseNone, "%24s\t%s\n----", "name", "size")
+		output.printColored(
+			color.FgWhite,
+			"%24s\t%s\n----\n",
+			"name",
+			"size",
+		)
 
 		for _, model := range models.Models {
 			if len(vbs) > 0 {
-				logMessage(verboseNone, "%24s\t%s\t%s", model.Name, humanize.Bytes(uint64(model.Size)), prettify(model.Details))
+				output.printColored(
+					color.FgHiWhite,
+					"%24s\t%s\t%s\n",
+					model.Name,
+					humanize.Bytes(uint64(model.Size)),
+					prettify(model.Details),
+				)
 			} else {
-				logMessage(verboseNone, "%24s\t%s", model.Name, humanize.Bytes(uint64(model.Size)))
+				output.printColored(
+					color.FgHiWhite,
+					"%24s\t%s\n",
+					model.Name,
+					humanize.Bytes(uint64(model.Size)),
+				)
 			}
 		}
 	} else {
-		logMessage(verboseMedium, "no local models were found.")
+		output.printColored(
+			color.FgHiRed,
+			"no local models were found.",
+		)
 	}
 
 	return 0, nil
@@ -541,12 +659,17 @@ func doListModels(
 // https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings
 func doEmbeddingsGeneration(
 	ctx context.Context,
+	output *outputWriter,
 	conf config,
 	p params,
 ) (exit int, e error) {
 	vbs := p.Verbose
 
-	logVerbose(verboseMedium, vbs, "generating embeddings...")
+	output.verbose(
+		verboseMedium,
+		vbs,
+		"generating embeddings...",
+	)
 
 	if p.Embeddings.EmbeddingsChunkSize == nil {
 		p.Embeddings.EmbeddingsChunkSize = ptr(defaultEmbeddingsChunkSize)
@@ -565,7 +688,10 @@ func doEmbeddingsGeneration(
 		return 1, fmt.Errorf("failed to chunk text: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(conf.TimeoutSeconds)*time.Second)
+	ctx, cancel := context.WithTimeout(
+		ctx,
+		time.Duration(conf.TimeoutSeconds)*time.Second,
+	)
 	defer cancel()
 
 	// ollama api client
@@ -613,7 +739,11 @@ func doEmbeddingsGeneration(
 	if err != nil {
 		return 1, fmt.Errorf("failed to marshal embeddings: %w", err)
 	}
-	logMessage(verboseNone, "%s", string(floats))
+	output.printColored(
+		color.FgHiWhite,
+		"%s\n",
+		string(floats),
+	)
 
 	return 0, nil
 }
@@ -626,6 +756,7 @@ const (
 
 // check if given `callbackPath` is executable
 func checkCallbackPath(
+	output *outputWriter,
 	callbackPath string,
 	confirmToolCallbacks map[string]bool,
 	fnCall api.ToolCallFunction,
@@ -685,7 +816,7 @@ func checkCallbackPath(
 
 		// run executable
 		fnCallback = func() (string, error) {
-			logVerbose(
+			output.verbose(
 				verboseMinimum,
 				vbs,
 				"executing callback '%s' for function '%s(%s)'...",

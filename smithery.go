@@ -13,7 +13,10 @@ import (
 )
 
 // get a matched server name and tool from given smithery tools and function name
-func smitheryToolFrom(smitheryTools map[string][]*mcp.Tool, fnName string) (serverName string, tool mcp.Tool, exists bool) {
+func smitheryToolFrom(
+	smitheryTools map[string][]*mcp.Tool,
+	fnName string,
+) (serverName string, tool mcp.Tool, exists bool) {
 	for serverName, tools := range smitheryTools {
 		for _, tool := range tools {
 			if tool != nil && tool.Name == fnName {

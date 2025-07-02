@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/jessevdk/go-flags"
 	"github.com/meinside/smithery-go"
 	"github.com/meinside/version-go"
@@ -38,27 +39,28 @@ Respond to user messages according to the following principles:
 )
 
 // run the application with params
-func run(parser *flags.Parser, p params) (exitCode int, err error) {
+func run(
+	output *outputWriter,
+	parser *flags.Parser,
+	p params,
+) (exitCode int, err error) {
 	// early return if no task was requested
 	if !p.taskRequested() {
-		logMessage(
-			verboseMedium,
-			"No task was requested.",
-		)
+		output.error("No task was requested")
 
-		return printHelpBeforeExit(1, parser), nil
+		return output.printHelpBeforeExit(1, parser), nil
 	}
 
 	// early return after printing the version
 	if p.ShowVersion {
-		logMessage(
-			verboseMinimum,
+		output.printColored(
+			color.FgGreen,
 			"%s %s\n\n",
 			appName,
 			version.Build(version.OS|version.Architecture),
 		)
 
-		return printHelpBeforeExit(0, parser), nil
+		return output.printHelpBeforeExit(0, parser), nil
 	}
 
 	// read and apply configs
@@ -88,23 +90,23 @@ func run(parser *flags.Parser, p params) (exitCode int, err error) {
 	}
 
 	// expand filepaths (recurse directories)
-	p.Generation.Filepaths, err = expandFilepaths(p)
+	p.Generation.Filepaths, err = expandFilepaths(output, p)
 	if err != nil {
 		return 1, fmt.Errorf("failed to read given filepaths: %w", err)
 	}
 
 	if p.hasPrompt() { // if prompt is given,
 		if p.Embeddings.GenerateEmbeddings {
-			logVerbose(
+			output.verbose(
 				verboseMaximum,
 				p.Verbose,
 				"embeddings request params with prompt: %s\n\n",
 				prettify(p),
 			)
 
-			return doEmbeddingsGeneration(context.TODO(), conf, p)
+			return doEmbeddingsGeneration(context.TODO(), output, conf, p)
 		} else {
-			logVerbose(
+			output.verbose(
 				verboseMaximum,
 				p.Verbose,
 				"generation request params with prompt: %s\n\n",
@@ -132,7 +134,7 @@ func run(parser *flags.Parser, p params) (exitCode int, err error) {
 				sc = newSmitheryClient(*conf.SmitheryAPIKey)
 
 				for _, smitheryServerName := range p.SmitheryTools.SmitheryServerNames {
-					logVerbose(
+					output.verbose(
 						verboseMedium,
 						p.Verbose,
 						"fetching tools for '%s' from smithery...",
@@ -167,13 +169,14 @@ func run(parser *flags.Parser, p params) (exitCode int, err error) {
 						)
 					}
 				}
-			} else if p.SmitheryTools.SmitheryProfileID != nil || len(p.SmitheryTools.SmitheryServerNames) > 0 {
+			} else if p.SmitheryTools.SmitheryProfileID != nil ||
+				len(p.SmitheryTools.SmitheryServerNames) > 0 {
 				if conf.SmitheryAPIKey == nil {
-					warn(
+					output.warn(
 						"Smithery API key is not set in the config file, so ignoring it for now.",
 					)
 				} else {
-					warn(
+					output.warn(
 						"Both profile id and server name is needed for using Smithery, so ignoring them for now.",
 					)
 				}
@@ -181,6 +184,7 @@ func run(parser *flags.Parser, p params) (exitCode int, err error) {
 
 			return doGeneration(
 				context.TODO(),
+				output,
 				conf,
 				*p.Model,
 				*p.Generation.SystemInstruction,
@@ -210,21 +214,23 @@ func run(parser *flags.Parser, p params) (exitCode int, err error) {
 			)
 		}
 	} else if p.ListModels {
-		return doListModels(context.TODO(), conf, p)
+		return doListModels(
+			context.TODO(),
+			output,
+			conf,
+			p,
+		)
 	} else { // otherwise,
-		logVerbose(
+		output.verbose(
 			verboseMaximum,
 			p.Verbose,
 			"falling back with params: %s\n\n",
 			prettify(p),
 		)
 
-		logMessage(
-			verboseMedium,
-			"Parameter error: no task was requested or handled properly.",
-		)
+		output.error("Parameter error: no task was requested or handled properly.")
 
-		return printHelpBeforeExit(1, parser), nil
+		return output.printHelpBeforeExit(1, parser), nil
 	}
 
 	// should not reach here

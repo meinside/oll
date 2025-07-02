@@ -23,6 +23,9 @@ func main() {
 		stdin, _ = io.ReadAll(os.Stdin)
 	}
 
+	// output writer (stdout/stderr)
+	output := newOutputWriter()
+
 	// parse params,
 	var p params
 	parser := flags.NewParser(&p, flags.HelpFlag|flags.PassDoubleDash)
@@ -35,29 +38,34 @@ func main() {
 				merged := string(stdin) + "\n\n" + *p.Generation.Prompt
 				p.Generation.Prompt = ptr(merged)
 
-				logVerbose(verboseMedium, p.Verbose, "merged prompt: %s\n\n", merged)
+				output.verbose(
+					verboseMedium,
+					p.Verbose,
+					"merged prompt: %s\n\n",
+					merged,
+				)
 			}
 		}
 
 		// check if multiple tasks were requested at a time
 		if p.multipleTaskRequested() {
-			logMessage(verboseMaximum, "Input error: multiple tasks were requested at a time.")
+			output.error("Input error: multiple tasks were requested at a time.")
 
-			os.Exit(printHelpBeforeExit(1, parser))
+			os.Exit(output.printHelpBeforeExit(1, parser))
 		}
 
 		// check if there was any parameter without flag
 		if len(remaining) > 0 {
-			logMessage(verboseMaximum, "Input error: parameters without flags: %s", strings.Join(remaining, " "))
+			output.error("Input error: parameters without flags: %s", strings.Join(remaining, " "))
 
-			os.Exit(printHelpBeforeExit(1, parser))
+			os.Exit(output.printHelpBeforeExit(1, parser))
 		}
 
 		// run with params
-		exit, err := run(parser, p)
+		exit, err := run(output, parser, p)
 
 		if err != nil {
-			os.Exit(printErrorBeforeExit(exit, "Error: %s", err))
+			os.Exit(output.printErrorBeforeExit(exit, "Error: %s", err))
 		} else {
 			os.Exit(exit)
 		}
@@ -67,15 +75,15 @@ func main() {
 			if e.Type != flags.ErrHelp {
 				helpExitCode = 1
 
-				logMessage(verboseMedium, "Input error: %s", e.Error())
+				output.error("Input error: %s", e.Error())
 			}
 
-			os.Exit(printHelpBeforeExit(helpExitCode, parser))
+			os.Exit(output.printHelpBeforeExit(helpExitCode, parser))
 		}
 
-		os.Exit(printErrorBeforeExit(1, "Failed to parse flags: %s", err))
+		os.Exit(output.printErrorBeforeExit(1, "Failed to parse flags: %s", err))
 	}
 
 	// should not reach here
-	os.Exit(printErrorBeforeExit(1, "Unhandled error."))
+	os.Exit(output.printErrorBeforeExit(1, "Unhandled error."))
 }

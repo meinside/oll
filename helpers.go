@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/fatih/color"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ollama/ollama/api"
@@ -83,25 +84,44 @@ func standardizeJSON(b []byte) ([]byte, error) {
 }
 
 // check if given directory should be ignored
-func ignoredDirectory(path string) bool {
+func ignoredDirectory(
+	output *outputWriter,
+	path string,
+) bool {
 	if _, exists := _dirNamesToIgnore[filepath.Base(path)]; exists {
-		logMessage(verboseMedium, "Ignoring directory '%s'", path)
+		output.printColored(
+			color.FgHiYellow,
+			"Ignoring directory: %s\n",
+			path,
+		)
 		return true
 	}
 	return false
 }
 
 // check if given file should be ignored
-func ignoredFile(path string, stat os.FileInfo) bool {
+func ignoredFile(
+	output *outputWriter,
+	path string,
+	stat os.FileInfo,
+) bool {
 	// ignore empty files,
 	if stat.Size() <= 0 {
-		logMessage(verboseMedium, "Ignoring empty file '%s'", path)
+		output.printColored(
+			color.FgHiYellow,
+			"Ignoring empty file: %s\n",
+			path,
+		)
 		return true
 	}
 
 	// ignore files with ignored names,
 	if _, exists := _fileNamesToIgnore[filepath.Base(path)]; exists {
-		logMessage(verboseMedium, "Ignoring file '%s'", path)
+		output.printColored(
+			color.FgHiYellow,
+			"Ignoring file: %s\n",
+			path,
+		)
 		return true
 	}
 
@@ -109,13 +129,17 @@ func ignoredFile(path string, stat os.FileInfo) bool {
 }
 
 // return all files' paths in the given directory
-func filesInDir(dir string, vbs []bool) ([]*string, error) {
+func filesInDir(
+	output *outputWriter,
+	dir string,
+	vbs []bool,
+) ([]*string, error) {
 	var files []*string
 
 	// traverse directory
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if d.IsDir() {
-			if ignoredDirectory(path) {
+			if ignoredDirectory(output, path) {
 				return filepath.SkipDir
 			}
 		} else {
@@ -124,11 +148,16 @@ func filesInDir(dir string, vbs []bool) ([]*string, error) {
 				return err
 			}
 
-			if ignoredFile(path, stat) {
+			if ignoredFile(output, path, stat) {
 				return nil
 			}
 
-			logVerbose(verboseMedium, vbs, "attaching file '%s'", path)
+			output.verbose(
+				verboseMedium,
+				vbs,
+				"attaching file '%s'",
+				path,
+			)
 
 			files = append(files, &path)
 		}
@@ -140,7 +169,10 @@ func filesInDir(dir string, vbs []bool) ([]*string, error) {
 }
 
 // expand given filepaths (expand directories with their sub files)
-func expandFilepaths(p params) (expanded []*string, err error) {
+func expandFilepaths(
+	output *outputWriter,
+	p params,
+) (expanded []*string, err error) {
 	filepaths := p.Generation.Filepaths
 	if filepaths == nil {
 		return nil, nil
@@ -155,13 +187,13 @@ func expandFilepaths(p params) (expanded []*string, err error) {
 
 		if stat, err := os.Stat(*fp); err == nil {
 			if stat.IsDir() {
-				if files, err := filesInDir(*fp, p.Verbose); err == nil {
+				if files, err := filesInDir(output, *fp, p.Verbose); err == nil {
 					expanded = append(expanded, files...)
 				} else {
 					return nil, fmt.Errorf("failed to list files in '%s': %w", *fp, err)
 				}
 			} else {
-				if ignoredFile(*fp, stat) {
+				if ignoredFile(output, *fp, stat) {
 					continue
 				}
 				expanded = append(expanded, fp)
@@ -182,7 +214,12 @@ func expandFilepaths(p params) (expanded []*string, err error) {
 			if supported {
 				filtered = append(filtered, fp)
 			} else {
-				logMessage(verboseMedium, "Ignoring file '%s', unsupported mime type: %s", *fp, matched)
+				output.printColored(
+					color.FgHiYellow,
+					"Ignoring file: %s; unsupported mime type: %s\n",
+					*fp,
+					matched,
+				)
 			}
 		} else {
 			return nil, fmt.Errorf("failed to check mime type of '%s': %w", *fp, err)
@@ -192,7 +229,12 @@ func expandFilepaths(p params) (expanded []*string, err error) {
 	// remove redundant paths
 	filtered = uniqPtrs(filtered)
 
-	logVerbose(verboseMedium, p.Verbose, "attaching %d unique file(s)", len(filtered))
+	output.verbose(
+		verboseMedium,
+		p.Verbose,
+		"attaching %d unique file(s)",
+		len(filtered),
+	)
 
 	return filtered, nil
 }
@@ -201,6 +243,7 @@ func expandFilepaths(p params) (expanded []*string, err error) {
 //
 // files that were not converted to text will be returned as `files`.
 func replaceURLsInPrompt(
+	output *outputWriter,
 	conf config,
 	userAgent *string,
 	prompt string,
@@ -210,14 +253,32 @@ func replaceURLsInPrompt(
 
 	re := regexp.MustCompile(urlRegexp)
 	for _, url := range re.FindAllString(prompt, -1) {
-		if fetched, contentType, err := fetchContent(conf.ReplaceHTTPURLTimeoutSeconds, userAgent, url, vbs); err == nil {
+		if fetched, contentType, err := fetchContent(
+			output,
+			conf.ReplaceHTTPURLTimeoutSeconds,
+			userAgent,
+			url,
+			vbs,
+		); err == nil {
 			if supportedTextContentType(contentType) { // if it is a text of supported types,
-				logVerbose(verboseMaximum, vbs, "text content (%s) fetched from '%s' is supported", contentType, url)
+				output.verbose(
+					verboseMaximum,
+					vbs,
+					"text content (%s) fetched from '%s' is supported",
+					contentType,
+					url,
+				)
 
 				// replace prompt text
 				prompt = strings.Replace(prompt, url, fmt.Sprintf("%s\n", string(fetched)), 1)
 			} else if mimeType, supported, _ := supportedMimeType(fetched); supported { // if it is a file of supported types,
-				logVerbose(verboseMaximum, vbs, "file content (%s) fetched from '%s' is supported", mimeType, url)
+				output.verbose(
+					verboseMaximum,
+					vbs,
+					"file content (%s) fetched from '%s' is supported",
+					mimeType,
+					url,
+				)
 
 				// replace prompt text,
 				prompt = strings.Replace(prompt, url, fmt.Sprintf(urlToTextFormat, url, mimeType, ""), 1)
@@ -225,10 +286,22 @@ func replaceURLsInPrompt(
 				// and add bytes as a file
 				files[url] = fetched
 			} else { // otherwise, (not supported in anyways)
-				logVerbose(verboseMaximum, vbs, "fetched content (%s) from '%s' is not supported", contentType, url)
+				output.verbose(
+					verboseMaximum,
+					vbs,
+					"fetched content (%s) from '%s' is not supported",
+					contentType,
+					url,
+				)
 			}
 		} else {
-			logVerbose(verboseMedium, vbs, "failed to fetch content from '%s': %s", url, err)
+			output.verbose(
+				verboseMedium,
+				vbs,
+				"failed to fetch content from '%s': %s",
+				url,
+				err,
+			)
 		}
 	}
 
@@ -236,12 +309,23 @@ func replaceURLsInPrompt(
 }
 
 // fetch the content from given url and convert it to text for prompting.
-func fetchContent(timeoutSeconds int, userAgent *string, url string, vbs []bool) (converted []byte, contentType string, err error) {
+func fetchContent(
+	output *outputWriter,
+	timeoutSeconds int,
+	userAgent *string,
+	url string,
+	vbs []bool,
+) (converted []byte, contentType string, err error) {
 	client := &http.Client{
 		Timeout: time.Duration(timeoutSeconds) * time.Second,
 	}
 
-	logVerbose(verboseMaximum, vbs, "fetching content from '%s'", url)
+	output.verbose(
+		verboseMaximum,
+		vbs,
+		"fetching content from '%s'",
+		url,
+	)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -259,14 +343,23 @@ func fetchContent(timeoutSeconds int, userAgent *string, url string, vbs []bool)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			logError("Failed to close response body: %s", err)
+			output.error(
+				"Failed to close response body: %s",
+				err,
+			)
 		}
 	}()
 
 	// NOTE: get the content type from the header, not inferencing from the body bytes
 	contentType = resp.Header.Get("Content-Type")
 
-	logVerbose(verboseMaximum, vbs, "fetched content (%s) from '%s'", contentType, url)
+	output.verbose(
+		verboseMaximum,
+		vbs,
+		"fetched content (%s) from '%s'",
+		contentType,
+		url,
+	)
 
 	if resp.StatusCode == 200 {
 		if supportedTextContentType(contentType) {
@@ -319,7 +412,12 @@ func fetchContent(timeoutSeconds int, userAgent *string, url string, vbs []bool)
 		err = fmt.Errorf("http error %d from '%s'", resp.StatusCode, url)
 	}
 
-	logVerbose(verboseMaximum, vbs, "fetched body =\n%s", string(converted))
+	output.verbose(
+		verboseMaximum,
+		vbs,
+		"fetched body =\n%s",
+		string(converted),
+	)
 
 	return converted, contentType, err
 }
@@ -372,7 +470,11 @@ func uniqPtrs[T comparable](slice []*T) []*T {
 }
 
 // convert given prompt & files for generation
-func convertPromptAndFiles(prompt string, filesInPrompt map[string][]byte, filepaths []*string) (convertedPrompt string, images []api.ImageData, err error) {
+func convertPromptAndFiles(
+	prompt string,
+	filesInPrompt map[string][]byte,
+	filepaths []*string,
+) (convertedPrompt string, images []api.ImageData, err error) {
 	images = []api.ImageData{}
 
 	type f struct {
@@ -420,7 +522,12 @@ func convertPromptAndFiles(prompt string, filesInPrompt map[string][]byte, filep
 		contexts = append(contexts, filesTagBegin)
 
 		for location, file := range files {
-			contexts = append(contexts, fmt.Sprintf("<file name=\"%[1]s\" type=\"%[2]s\">\n%[3]s\n</file>", location, file.mimeType, string(file.data)))
+			contexts = append(contexts, fmt.Sprintf(
+				"<file name=\"%[1]s\" type=\"%[2]s\">\n%[3]s\n</file>",
+				location,
+				file.mimeType,
+				string(file.data),
+			))
 		}
 
 		contexts = append(contexts, filesTagEnd+"\n\n")
@@ -429,6 +536,7 @@ func convertPromptAndFiles(prompt string, filesInPrompt map[string][]byte, filep
 	return fmt.Sprintf("%s%s", strings.Join(contexts, "\n"), prompt), images, nil
 }
 
+// check if given image data is supported or not
 func supportedImage(data []byte) (supported bool, err error) {
 	var mimeType *mimetype.MIME
 	if mimeType, err = mimetype.DetectReader(bytes.NewReader(data)); err == nil {
@@ -572,7 +680,10 @@ type ChunkedText struct {
 }
 
 // ChunkText splits the given text into chunks of the specified size.
-func ChunkText(text string, opts ...TextChunkOption) (ChunkedText, error) {
+func ChunkText(
+	text string,
+	opts ...TextChunkOption,
+) (ChunkedText, error) {
 	opt := TextChunkOption{
 		ChunkSize:      defaultChunkedTextLengthInBytes,
 		OverlappedSize: defaultOverlappedTextLengthInBytes,
