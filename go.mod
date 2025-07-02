@@ -9,10 +9,10 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.9
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jwalton/go-supportscolor v1.2.0
-	github.com/meinside/smithery-go v0.1.0
+	github.com/meinside/smithery-go v0.1.2
 	github.com/meinside/version-go v0.0.3
-	github.com/modelcontextprotocol/go-sdk v0.0.0-20250630184440-2facfc6ffe0b
-	github.com/ollama/ollama v0.9.3
+	github.com/modelcontextprotocol/go-sdk v0.1.0
+	github.com/ollama/ollama v0.9.4
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 )
 
