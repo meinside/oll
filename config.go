@@ -18,10 +18,14 @@ type config struct {
 	TimeoutSeconds int `json:"timeout_seconds,omitempty"`
 
 	ReplaceHTTPURLTimeoutSeconds int `json:"replace_http_url_timeout_seconds,omitempty"`
+
+	SmitheryAPIKey *string `json:"smithery_api_key,omitempty"`
 }
 
 // read config from given filepath
-func readConfig(configFilepath string) (conf config, err error) {
+func readConfig(
+	configFilepath string,
+) (conf config, err error) {
 	var bytes []byte
 
 	bytes, err = os.ReadFile(configFilepath)
@@ -45,7 +49,9 @@ func readConfig(configFilepath string) (conf config, err error) {
 }
 
 // resolve config filepath
-func resolveConfigFilepath(configFilepath *string) string {
+func resolveConfigFilepath(
+	configFilepath *string,
+) string {
 	if configFilepath != nil {
 		return *configFilepath
 	}

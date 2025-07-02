@@ -5,11 +5,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -17,7 +20,9 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/fatih/color"
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ollama/ollama/api"
 	"github.com/tailscale/hujson"
 )
@@ -79,25 +84,44 @@ func standardizeJSON(b []byte) ([]byte, error) {
 }
 
 // check if given directory should be ignored
-func ignoredDirectory(path string) bool {
+func ignoredDirectory(
+	output *outputWriter,
+	path string,
+) bool {
 	if _, exists := _dirNamesToIgnore[filepath.Base(path)]; exists {
-		logMessage(verboseMedium, "Ignoring directory '%s'", path)
+		output.printColored(
+			color.FgHiYellow,
+			"Ignoring directory: %s\n",
+			path,
+		)
 		return true
 	}
 	return false
 }
 
 // check if given file should be ignored
-func ignoredFile(path string, stat os.FileInfo) bool {
+func ignoredFile(
+	output *outputWriter,
+	path string,
+	stat os.FileInfo,
+) bool {
 	// ignore empty files,
 	if stat.Size() <= 0 {
-		logMessage(verboseMedium, "Ignoring empty file '%s'", path)
+		output.printColored(
+			color.FgHiYellow,
+			"Ignoring empty file: %s\n",
+			path,
+		)
 		return true
 	}
 
 	// ignore files with ignored names,
 	if _, exists := _fileNamesToIgnore[filepath.Base(path)]; exists {
-		logMessage(verboseMedium, "Ignoring file '%s'", path)
+		output.printColored(
+			color.FgHiYellow,
+			"Ignoring file: %s\n",
+			path,
+		)
 		return true
 	}
 
@@ -105,13 +129,17 @@ func ignoredFile(path string, stat os.FileInfo) bool {
 }
 
 // return all files' paths in the given directory
-func filesInDir(dir string, vbs []bool) ([]*string, error) {
+func filesInDir(
+	output *outputWriter,
+	dir string,
+	vbs []bool,
+) ([]*string, error) {
 	var files []*string
 
 	// traverse directory
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if d.IsDir() {
-			if ignoredDirectory(path) {
+			if ignoredDirectory(output, path) {
 				return filepath.SkipDir
 			}
 		} else {
@@ -120,11 +148,16 @@ func filesInDir(dir string, vbs []bool) ([]*string, error) {
 				return err
 			}
 
-			if ignoredFile(path, stat) {
+			if ignoredFile(output, path, stat) {
 				return nil
 			}
 
-			logVerbose(verboseMedium, vbs, "attaching file '%s'", path)
+			output.verbose(
+				verboseMedium,
+				vbs,
+				"attaching file '%s'",
+				path,
+			)
 
 			files = append(files, &path)
 		}
@@ -136,7 +169,10 @@ func filesInDir(dir string, vbs []bool) ([]*string, error) {
 }
 
 // expand given filepaths (expand directories with their sub files)
-func expandFilepaths(p params) (expanded []*string, err error) {
+func expandFilepaths(
+	output *outputWriter,
+	p params,
+) (expanded []*string, err error) {
 	filepaths := p.Generation.Filepaths
 	if filepaths == nil {
 		return nil, nil
@@ -151,13 +187,13 @@ func expandFilepaths(p params) (expanded []*string, err error) {
 
 		if stat, err := os.Stat(*fp); err == nil {
 			if stat.IsDir() {
-				if files, err := filesInDir(*fp, p.Verbose); err == nil {
+				if files, err := filesInDir(output, *fp, p.Verbose); err == nil {
 					expanded = append(expanded, files...)
 				} else {
 					return nil, fmt.Errorf("failed to list files in '%s': %w", *fp, err)
 				}
 			} else {
-				if ignoredFile(*fp, stat) {
+				if ignoredFile(output, *fp, stat) {
 					continue
 				}
 				expanded = append(expanded, fp)
@@ -178,7 +214,12 @@ func expandFilepaths(p params) (expanded []*string, err error) {
 			if supported {
 				filtered = append(filtered, fp)
 			} else {
-				logMessage(verboseMedium, "Ignoring file '%s', unsupported mime type: %s", *fp, matched)
+				output.printColored(
+					color.FgHiYellow,
+					"Ignoring file: %s; unsupported mime type: %s\n",
+					*fp,
+					matched,
+				)
 			}
 		} else {
 			return nil, fmt.Errorf("failed to check mime type of '%s': %w", *fp, err)
@@ -188,31 +229,56 @@ func expandFilepaths(p params) (expanded []*string, err error) {
 	// remove redundant paths
 	filtered = uniqPtrs(filtered)
 
-	logVerbose(verboseMedium, p.Verbose, "attaching %d unique file(s)", len(filtered))
+	output.verbose(
+		verboseMedium,
+		p.Verbose,
+		"attaching %d unique file(s)",
+		len(filtered),
+	)
 
 	return filtered, nil
 }
 
-// replace all HTTP URLs in `p.Prompt` to the content of each URL.
+// replace all HTTP URLs in `prompt` to the content of each URL.
 //
 // files that were not converted to text will be returned as `files`.
-func replaceURLsInPrompt(conf config, p params) (replaced string, files map[string][]byte) {
-	userAgent := *p.UserAgent
-	prompt := *p.Generation.Prompt
-	vbs := p.Verbose
-
+func replaceURLsInPrompt(
+	output *outputWriter,
+	conf config,
+	userAgent *string,
+	prompt string,
+	vbs []bool,
+) (replaced string, files map[string][]byte) {
 	files = map[string][]byte{}
 
 	re := regexp.MustCompile(urlRegexp)
 	for _, url := range re.FindAllString(prompt, -1) {
-		if fetched, contentType, err := fetchContent(conf.ReplaceHTTPURLTimeoutSeconds, userAgent, url, vbs); err == nil {
+		if fetched, contentType, err := fetchContent(
+			output,
+			conf.ReplaceHTTPURLTimeoutSeconds,
+			userAgent,
+			url,
+			vbs,
+		); err == nil {
 			if supportedTextContentType(contentType) { // if it is a text of supported types,
-				logVerbose(verboseMaximum, vbs, "text content (%s) fetched from '%s' is supported", contentType, url)
+				output.verbose(
+					verboseMaximum,
+					vbs,
+					"text content (%s) fetched from '%s' is supported",
+					contentType,
+					url,
+				)
 
 				// replace prompt text
 				prompt = strings.Replace(prompt, url, fmt.Sprintf("%s\n", string(fetched)), 1)
 			} else if mimeType, supported, _ := supportedMimeType(fetched); supported { // if it is a file of supported types,
-				logVerbose(verboseMaximum, vbs, "file content (%s) fetched from '%s' is supported", mimeType, url)
+				output.verbose(
+					verboseMaximum,
+					vbs,
+					"file content (%s) fetched from '%s' is supported",
+					mimeType,
+					url,
+				)
 
 				// replace prompt text,
 				prompt = strings.Replace(prompt, url, fmt.Sprintf(urlToTextFormat, url, mimeType, ""), 1)
@@ -220,10 +286,22 @@ func replaceURLsInPrompt(conf config, p params) (replaced string, files map[stri
 				// and add bytes as a file
 				files[url] = fetched
 			} else { // otherwise, (not supported in anyways)
-				logVerbose(verboseMaximum, vbs, "fetched content (%s) from '%s' is not supported", contentType, url)
+				output.verbose(
+					verboseMaximum,
+					vbs,
+					"fetched content (%s) from '%s' is not supported",
+					contentType,
+					url,
+				)
 			}
 		} else {
-			logVerbose(verboseMedium, vbs, "failed to fetch content from '%s': %s", url, err)
+			output.verbose(
+				verboseMedium,
+				vbs,
+				"failed to fetch content from '%s': %s",
+				url,
+				err,
+			)
 		}
 	}
 
@@ -231,18 +309,33 @@ func replaceURLsInPrompt(conf config, p params) (replaced string, files map[stri
 }
 
 // fetch the content from given url and convert it to text for prompting.
-func fetchContent(timeoutSeconds int, userAgent, url string, vbs []bool) (converted []byte, contentType string, err error) {
+func fetchContent(
+	output *outputWriter,
+	timeoutSeconds int,
+	userAgent *string,
+	url string,
+	vbs []bool,
+) (converted []byte, contentType string, err error) {
 	client := &http.Client{
 		Timeout: time.Duration(timeoutSeconds) * time.Second,
 	}
 
-	logVerbose(verboseMaximum, vbs, "fetching content from '%s'", url)
+	output.verbose(
+		verboseMaximum,
+		vbs,
+		"fetching content from '%s'",
+		url,
+	)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, contentType, fmt.Errorf("failed to create http request: %w", err)
 	}
-	req.Header.Set("User-Agent", userAgent)
+	if userAgent != nil {
+		req.Header.Set("User-Agent", *userAgent)
+	} else {
+		req.Header.Set("User-Agent", defaultUserAgent)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -250,14 +343,23 @@ func fetchContent(timeoutSeconds int, userAgent, url string, vbs []bool) (conver
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			logError("Failed to close response body: %s", err)
+			output.error(
+				"Failed to close response body: %s",
+				err,
+			)
 		}
 	}()
 
 	// NOTE: get the content type from the header, not inferencing from the body bytes
 	contentType = resp.Header.Get("Content-Type")
 
-	logVerbose(verboseMaximum, vbs, "fetched content (%s) from '%s'", contentType, url)
+	output.verbose(
+		verboseMaximum,
+		vbs,
+		"fetched content (%s) from '%s'",
+		contentType,
+		url,
+	)
 
 	if resp.StatusCode == 200 {
 		if supportedTextContentType(contentType) {
@@ -310,7 +412,12 @@ func fetchContent(timeoutSeconds int, userAgent, url string, vbs []bool) (conver
 		err = fmt.Errorf("http error %d from '%s'", resp.StatusCode, url)
 	}
 
-	logVerbose(verboseMaximum, vbs, "fetched body =\n%s", string(converted))
+	output.verbose(
+		verboseMaximum,
+		vbs,
+		"fetched body =\n%s",
+		string(converted),
+	)
 
 	return converted, contentType, err
 }
@@ -363,7 +470,11 @@ func uniqPtrs[T comparable](slice []*T) []*T {
 }
 
 // convert given prompt & files for generation
-func convertPromptAndFiles(prompt string, filesInPrompt map[string][]byte, filepaths []*string) (convertedPrompt string, images []api.ImageData, err error) {
+func convertPromptAndFiles(
+	prompt string,
+	filesInPrompt map[string][]byte,
+	filepaths []*string,
+) (convertedPrompt string, images []api.ImageData, err error) {
 	images = []api.ImageData{}
 
 	type f struct {
@@ -411,7 +522,12 @@ func convertPromptAndFiles(prompt string, filesInPrompt map[string][]byte, filep
 		contexts = append(contexts, filesTagBegin)
 
 		for location, file := range files {
-			contexts = append(contexts, fmt.Sprintf("<file name=\"%[1]s\" type=\"%[2]s\">\n%[3]s\n</file>", location, file.mimeType, string(file.data)))
+			contexts = append(contexts, fmt.Sprintf(
+				"<file name=\"%[1]s\" type=\"%[2]s\">\n%[3]s\n</file>",
+				location,
+				file.mimeType,
+				string(file.data),
+			))
 		}
 
 		contexts = append(contexts, filesTagEnd+"\n\n")
@@ -420,6 +536,7 @@ func convertPromptAndFiles(prompt string, filesInPrompt map[string][]byte, filep
 	return fmt.Sprintf("%s%s", strings.Join(contexts, "\n"), prompt), images, nil
 }
 
+// check if given image data is supported or not
 func supportedImage(data []byte) (supported bool, err error) {
 	var mimeType *mimetype.MIME
 	if mimeType, err = mimetype.DetectReader(bytes.NewReader(data)); err == nil {
@@ -431,6 +548,7 @@ func supportedImage(data []byte) (supported bool, err error) {
 	return false, err
 }
 
+// detect and return whether given path is an image
 func supportedImagePath(filepath string) (supported bool, err error) {
 	var f *os.File
 	if f, err = os.Open(filepath); err == nil {
@@ -562,7 +680,10 @@ type ChunkedText struct {
 }
 
 // ChunkText splits the given text into chunks of the specified size.
-func ChunkText(text string, opts ...TextChunkOption) (ChunkedText, error) {
+func ChunkText(
+	text string,
+	opts ...TextChunkOption,
+) (ChunkedText, error) {
 	opt := TextChunkOption{
 		ChunkSize:      defaultChunkedTextLengthInBytes,
 		OverlappedSize: defaultOverlappedTextLengthInBytes,
@@ -612,4 +733,171 @@ func ChunkText(text string, opts ...TextChunkOption) (ChunkedText, error) {
 		Original: text,
 		Chunks:   chunks,
 	}, nil
+}
+
+// expand given path
+func expandPath(path string) string {
+	// handle `~/*`,
+	if strings.HasPrefix(path, "~/") {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			path = strings.Replace(
+				path,
+				"~",
+				homeDir,
+				1,
+			)
+		}
+	}
+
+	// expand environment variables, eg. $HOME
+	path = os.ExpandEnv(path)
+
+	// clean,
+	path = filepath.Clean(path)
+
+	return path
+}
+
+// run executable with given args and return its result
+func runExecutable(
+	execPath string,
+	args map[string]any,
+) (result string, err error) {
+	execPath = expandPath(execPath)
+
+	// marshal args
+	var paramArgs []byte
+	paramArgs, err = json.Marshal(args)
+	if err != nil {
+		return "", fmt.Errorf(
+			"failed to marshal args: %w",
+			err,
+		)
+	}
+
+	// and run
+	arg := string(paramArgs)
+	cmd := exec.Command(execPath, arg)
+	var output []byte
+	output, err = cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf(
+			"failed to run '%s' with args %s: %w",
+			execPath,
+			arg,
+			err,
+		)
+	}
+
+	return string(output), nil
+}
+
+// confirm with the given prompt (y/n)
+func confirm(prompt string) bool {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Printf("%s (y/N): ", prompt)
+
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Fprintln(
+				os.Stderr,
+				"Error reading input:",
+				err,
+			)
+			continue
+		}
+		response = strings.ToLower(strings.TrimSpace(response))
+		if strings.HasPrefix(response, "y") {
+			return true
+		} else {
+			return false
+		}
+	}
+}
+
+// read user input from stdin
+func readFromStdin(prompt string) (string, error) {
+	fmt.Printf("%s: ", prompt)
+	reader := bufio.NewReader(os.Stdin)
+	return reader.ReadString('\n')
+}
+
+// check if there is any duplicated value between given arrays
+func duplicated[V comparable](arrs ...[]V) (value V, duplicated bool) {
+	pool := map[V]struct{}{}
+	for _, arr := range arrs {
+		for _, v := range arr {
+			if _, exists := pool[v]; exists {
+				return v, true
+			}
+			pool[v] = struct{}{}
+		}
+	}
+	var zero V
+	return zero, false
+}
+
+// extract keys from given tools
+func keysFromTools(
+	localTools []api.Tool,
+	smitheryTools map[string][]*mcp.Tool,
+) (localToolKeys, smitheryToolKeys []string) {
+	for _, tool := range localTools {
+		localToolKeys = append(localToolKeys, tool.Function.Name)
+	}
+	for _, tools := range smitheryTools {
+		for _, tool := range tools {
+			smitheryToolKeys = append(smitheryToolKeys, tool.Name)
+		}
+	}
+
+	return
+}
+
+// check if the past generations end with users's message,
+func historyEndsWithUsers(history []api.Message) bool {
+	if len(history) > 0 {
+		last := history[len(history)-1]
+
+		return last.Role == "user"
+	}
+	return false
+}
+
+// append a user message to the past generations
+func appendUserMessageToPastGenerations(
+	history []api.Message,
+	message string,
+) []api.Message {
+	return append(history, api.Message{
+		Role:    "user",
+		Content: message,
+	})
+}
+
+// append a model response to the past generations
+func appendModelResponseToPastGenerations(
+	history []api.Message,
+	generated string,
+) []api.Message {
+	if len(history) > 0 {
+		last := history[len(history)-1]
+		if last.Role == "assistant" {
+			last.Content += generated
+		} else {
+			history = append(history, api.Message{
+				Role:    "assistant",
+				Content: generated,
+			})
+		}
+	} else {
+		return []api.Message{
+			{
+				Role:    "assistant",
+				Content: generated,
+			},
+		}
+	}
+	return history
 }
