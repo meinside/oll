@@ -27,8 +27,8 @@ github.com/meinside/version-go v0.0.3 h1:GXSwi6sTmgpnSR09jAAqDGWeX2Nq52fe5xpitgA
 github.com/meinside/version-go v0.0.3/go.mod h1:mFvlwbro1E126u4rU727CcHNa8OPFyhq+KDYYNysFj4=
 github.com/modelcontextprotocol/go-sdk v0.1.0 h1:ItzbFWYNt4EHcUrScX7P8JPASn1FVYb29G773Xkl+IU=
 github.com/modelcontextprotocol/go-sdk v0.1.0/go.mod h1:DcXfbr7yl7e35oMpzHfKw2nUYRjhIGS2uou/6tdsTB0=
-github.com/ollama/ollama v0.9.4 h1:hurJeOKx0mK1o4Y7bUtPLf3fn5x7lCYOg2HI1fOn7mY=
-github.com/ollama/ollama v0.9.4/go.mod h1:zLwx3iZ3AI4Rc/egsrx3u1w4RU2MHQ/Ylxse48jvyt4=
+github.com/ollama/ollama v0.9.6 h1:HZNJmB52pMt6zLkGkkheBuXBXM5478eiSAj7GR75AMc=
+github.com/ollama/ollama v0.9.6/go.mod h1:zLwx3iZ3AI4Rc/egsrx3u1w4RU2MHQ/Ylxse48jvyt4=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsTg=
