@@ -64,7 +64,7 @@ func doGeneration(
 	contextWindowSize *int,
 	prompt string,
 	filepaths []*string,
-	showCallbackResults, recurseOnCallbackResults bool,
+	showCallbackResults, recurseOnCallbackResults bool, forceCallDestructiveTools bool,
 	localTools []api.Tool,
 	localToolCallbacks map[string]string,
 	localToolCallbacksConfirm map[string]bool,
@@ -340,6 +340,7 @@ func doGeneration(
 									output,
 									callbackPath,
 									localToolCallbacksConfirm,
+									forceCallDestructiveTools,
 									call.Function,
 									vbs,
 								)
@@ -417,7 +418,7 @@ func doGeneration(
 								}
 							} else if smitheryProfileID != nil {
 								// or with smithery,
-								if serverName, _, exists := smitheryToolFrom(
+								if serverName, tool, exists := smitheryToolFrom(
 									smitheryTools,
 									call.Function.Name,
 								); exists {
@@ -428,35 +429,71 @@ func doGeneration(
 										return fmt.Errorf("possible infinite loop detected: '%s'", fn)
 									}
 
-									if res, err := fetchSmitheryToolCallResult(
-										ctx,
-										smitheryClient,
-										*smitheryProfileID, serverName,
-										call.Function.Name, call.Function.Arguments,
-									); err == nil {
-										fnResult := fmt.Sprintf(
-											"Tool call result of '%s':\n%s",
-											fn,
-											prettify(res.Content),
-										)
+									okToRun := false
 
-										// print the result of execution
-										if showCallbackResults ||
-											verboseLevel(vbs) >= verboseMinimum {
-											output.printColored(
-												color.FgHiCyan,
-												"%s\n",
+									// check if matched smithery tool requires confirmation
+									if tool.Annotations != nil &&
+										tool.Annotations.DestructiveHint != nil &&
+										*tool.Annotations.DestructiveHint &&
+										!forceCallDestructiveTools {
+										okToRun = confirm(fmt.Sprintf(
+											"May I call tool '%s/%s' from smithery for function '%s'?",
+											serverName,
+											call.Function.Name,
+											fn,
+										))
+									} else {
+										okToRun = true
+									}
+
+									if okToRun {
+										if res, err := fetchSmitheryToolCallResult(
+											ctx,
+											smitheryClient,
+											*smitheryProfileID, serverName,
+											call.Function.Name, call.Function.Arguments,
+										); err == nil {
+											fnResult := fmt.Sprintf(
+												"Tool call result of '%s':\n%s",
+												fn,
+												prettify(res.Content),
+											)
+
+											// print the result of execution
+											if showCallbackResults ||
+												verboseLevel(vbs) >= verboseMinimum {
+												output.printColored(
+													color.FgHiCyan,
+													"%s\n",
+													fnResult,
+												)
+											}
+
+											// print generated content
+											pastGenerations = appendUserMessageToPastGenerations(
+												pastGenerations,
 												fnResult,
 											)
+										} else {
+											return fmt.Errorf("failed to call smithery tool: %w", err)
 										}
+									} else {
+										output.printColored(
+											color.FgHiYellow,
+											"Skipped execution of smithery tool '%s/%s' for function '%s'.\n",
+											serverName,
+											call.Function.Name,
+											fn,
+										)
 
-										// print generated content
+										// append function call result (not called)
 										pastGenerations = appendUserMessageToPastGenerations(
 											pastGenerations,
-											fnResult,
+											fmt.Sprintf(
+												`User chose not to call function '%s'.`,
+												fn,
+											),
 										)
-									} else {
-										return fmt.Errorf("failed to call smithery tool: %w", err)
 									}
 								}
 							} else {
@@ -565,6 +602,7 @@ func doGeneration(
 				filepaths,
 				showCallbackResults,
 				recurseOnCallbackResults,
+				forceCallDestructiveTools,
 				localTools,
 				localToolCallbacks,
 				localToolCallbacksConfirm,
@@ -759,6 +797,7 @@ func checkCallbackPath(
 	output *outputWriter,
 	callbackPath string,
 	confirmToolCallbacks map[string]bool,
+	forceCallDestructiveTools bool,
 	fnCall api.ToolCallFunction,
 	vbs []bool,
 ) (
@@ -803,7 +842,7 @@ func checkCallbackPath(
 		}
 	} else { // ordinary path of binary/script:
 		// ask for confirmation
-		if confirmNeeded, exists := confirmToolCallbacks[fnCall.Name]; exists && confirmNeeded {
+		if confirmNeeded, exists := confirmToolCallbacks[fnCall.Name]; exists && confirmNeeded && !forceCallDestructiveTools {
 			okToRun = confirm(fmt.Sprintf(
 				"May I execute callback '%s' for function '%s(%s)'?",
 				callbackPath,

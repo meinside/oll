@@ -200,6 +200,7 @@ func run(
 				p.Generation.Filepaths,
 				p.Tools.ShowCallbackResults,
 				p.Tools.RecurseOnCallbackResults,
+				p.Tools.ForceCallDestructiveTools,
 				localTools,
 				p.LocalTools.ToolCallbacks,
 				p.LocalTools.ToolCallbacksConfirm,
