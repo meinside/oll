@@ -376,46 +376,35 @@ $ oll -m "mistral-small3.2:24b" \
 
 When the format string is omitted (`--tool-callbacks="YOUR_CALLBACK:@format"`), it will be printed as a JSON string.
 
-### Function Call with MCP: Smithery
+### Function Call with MCP
 
-Put your Smithery API key in your `config.json`,
-
-```json
-{
-  "smithery_api_key": "YOUR_SMITHERY_API_KEY",
-}
-```
-
-then call with your smithery profile id and desired server name like:
+### Streamable HTTP URLs
 
 ```bash
 $ oll -m "mistral-small3.2:24b" \
     -p "what is shoebill? search from the web" \
-    --smithery-profile-id="your-smithery-profile-id" \
-    --smithery-server-name="exa" \
+    --mcp-streamable-url="https://server.smithery.ai/exa/mcp?api_key=xxxxx&profile=yyyyy" \
     --recurse-on-callback-results
 ```
 
-You can use `--smithery-server-name` multiple times for using multiple servers' functions:
+You can use `--mcp-streamable-url` multiple times for using multiple servers' functions:
 
 ```bash
 $ oll -m "mistral-small3.2:24b" \
     -p '1. get any one github repository of @meinside
 2. search for the respository name from web
 3. then summarize the searched results' \
-    --smithery-profile-id="your-smithery-profile-id" \
-    --smithery-server-name="exa" \
-    --smithery-server-name="@smithery-ai/github" \
+    --mcp-streamable-url="https://server.smithery.ai/exa/mcp?api_key=xxxxx&profile=yyyyy" \
+    --mcp-streamable-url="https://server.smithery.ai/@smithery-ai/github/mcp?api_key=xxxxx&profile=yyyyy" \
     --recurse-on-callback-results
 ```
 
-You can even mix local tools and Smithery:
+You can even mix tools from local and MCP servers:
 
 ```bash
 $ oll -m "mistral-small3.2:24b" \
     -p "summarize the latest commits of repository 'oll' of github user @meinside (branch: master) and send them as an email to asdf@zxcv.net" \
-    --smithery-profile-id="your-smithery-profile-id" \
-    --smithery-server-name="@smithery-ai/github" \
+    --mcp-streamable-url="https://server.smithery.ai/@smithery-ai/github/mcp?api_key=xxxxx&profile=yyyyy" \
     --tools='[{
         "type": "function",
         "function":{

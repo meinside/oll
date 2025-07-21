@@ -11,7 +11,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jessevdk/go-flags"
-	"github.com/meinside/smithery-go"
 	"github.com/meinside/version-go"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ollama/ollama/api"
@@ -125,37 +124,30 @@ func run(
 				}
 			}
 
-			// tools (smithery)
-			var sc *smithery.Client
-			var allSmitheryTools map[string][]*mcp.Tool = nil
-			if conf.SmitheryAPIKey != nil &&
-				p.SmitheryTools.SmitheryProfileID != nil &&
-				len(p.SmitheryTools.SmitheryServerNames) > 0 {
-				sc = newSmitheryClient(*conf.SmitheryAPIKey)
-
-				for _, smitheryServerName := range p.SmitheryTools.SmitheryServerNames {
+			// tools (MCP)
+			var allMCPTools map[string][]*mcp.Tool = nil // key: streamable http url, value: tools
+			if len(p.MCPTools.MCPStreamableURLs) > 0 {
+				for _, serverURL := range p.MCPTools.MCPStreamableURLs {
 					output.verbose(
 						verboseMedium,
 						p.Verbose,
-						"fetching tools for '%s' from smithery...",
-						smitheryServerName,
+						"fetching tools from '%s'...",
+						stripURLParams(serverURL),
 					)
 
-					var fetchedSmitheryTools []*mcp.Tool
-					if fetchedSmitheryTools, err = fetchSmitheryTools(
+					var fetchedTools []*mcp.Tool
+					if fetchedTools, err = fetchMCPTools(
 						context.TODO(),
-						sc,
-						*p.SmitheryTools.SmitheryProfileID,
-						smitheryServerName,
+						serverURL,
 					); err == nil {
-						if allSmitheryTools == nil {
-							allSmitheryTools = map[string][]*mcp.Tool{}
+						if allMCPTools == nil {
+							allMCPTools = map[string][]*mcp.Tool{}
 						}
-						allSmitheryTools[smitheryServerName] = fetchedSmitheryTools
+						allMCPTools[serverURL] = fetchedTools
 
 						// check if there is any duplicated name of function
 						if value, duplicated := duplicated(
-							keysFromTools(localTools, allSmitheryTools),
+							keysFromTools(localTools, allMCPTools),
 						); duplicated {
 							return 1, fmt.Errorf(
 								"duplicated function name in tools: '%s'",
@@ -164,21 +156,11 @@ func run(
 						}
 					} else {
 						return 1, fmt.Errorf(
-							"failed to fetch tools from smithery: %w",
+							"failed to fetch tools from '%s': %w",
+							stripURLParams(serverURL),
 							err,
 						)
 					}
-				}
-			} else if p.SmitheryTools.SmitheryProfileID != nil ||
-				len(p.SmitheryTools.SmitheryServerNames) > 0 {
-				if conf.SmitheryAPIKey == nil {
-					output.warn(
-						"Smithery API key is not set in the config file, so ignoring it for now.",
-					)
-				} else {
-					output.warn(
-						"Both profile id and server name is needed for using Smithery, so ignoring them for now.",
-					)
 				}
 			}
 
@@ -204,10 +186,7 @@ func run(
 				localTools,
 				p.LocalTools.ToolCallbacks,
 				p.LocalTools.ToolCallbacksConfirm,
-				conf.SmitheryAPIKey,
-				sc,
-				p.SmitheryTools.SmitheryProfileID,
-				allSmitheryTools,
+				allMCPTools,
 				nil,
 				p.UserAgent,
 				p.ReplaceHTTPURLsInPrompt,

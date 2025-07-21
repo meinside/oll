@@ -16,7 +16,6 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
-	"github.com/meinside/smithery-go"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ollama/ollama/api"
 )
@@ -68,10 +67,7 @@ func doGeneration(
 	localTools []api.Tool,
 	localToolCallbacks map[string]string,
 	localToolCallbacksConfirm map[string]bool,
-	smitheryAPIKey *string,
-	smitheryClient *smithery.Client,
-	smitheryProfileID *string,
-	smitheryTools map[string][]*mcp.Tool,
+	mcpTools map[string][]*mcp.Tool,
 	pastGenerations []api.Message,
 	userAgent *string,
 	replaceHTTPURLsInPrompt bool,
@@ -190,19 +186,19 @@ func doGeneration(
 	if len(localTools) > 0 {
 		req.Tools = append(req.Tools, localTools...)
 	}
-	// (tools - smithery)
-	var smitheryToOllamaTools []api.Tool = nil
-	for _, tools := range smitheryTools {
+	// (tools - MCP)
+	var ollamaTools []api.Tool = nil
+	for _, tools := range mcpTools {
 		if converted, err := mcpToOllamaTools(tools); err == nil {
 			for _, c := range converted {
-				smitheryToOllamaTools = append(smitheryToOllamaTools, *c)
+				ollamaTools = append(ollamaTools, *c)
 			}
 		} else {
-			return 1, fmt.Errorf("failed to convert smithery tools: %w", err)
+			return 1, fmt.Errorf("failed to convert MCP tools: %w", err)
 		}
 	}
-	if len(smitheryToOllamaTools) > 0 {
-		req.Tools = append(req.Tools, smitheryToOllamaTools...)
+	if len(ollamaTools) > 0 {
+		req.Tools = append(req.Tools, ollamaTools...)
 	}
 	// (thinking)
 	req.Think = ptr(withThinking)
@@ -416,85 +412,82 @@ func doGeneration(
 										),
 									})
 								}
-							} else if smitheryProfileID != nil {
-								// or with smithery,
-								if serverName, tool, exists := smitheryToolFrom(
-									smitheryTools,
-									call.Function.Name,
-								); exists {
-									// NOTE: avoid infinite loops
-									if slices.ContainsFunc(pastGenerations, func(message api.Message) bool {
-										return strings.Contains(message.Content, fn)
-									}) {
-										return fmt.Errorf("possible infinite loop detected: '%s'", fn)
-									}
+							} else if serverURL, tool, exists := mcpToolFrom(
+								mcpTools,
+								call.Function.Name,
+							); exists {
+								// NOTE: avoid infinite loops
+								if slices.ContainsFunc(pastGenerations, func(message api.Message) bool {
+									return strings.Contains(message.Content, fn)
+								}) {
+									return fmt.Errorf("possible infinite loop detected: '%s'", fn)
+								}
 
-									okToRun := false
+								okToRun := false
 
-									// check if matched smithery tool requires confirmation
-									if tool.Annotations != nil &&
-										tool.Annotations.DestructiveHint != nil &&
-										*tool.Annotations.DestructiveHint &&
-										!forceCallDestructiveTools {
-										okToRun = confirm(fmt.Sprintf(
-											"May I call tool '%s/%s' from smithery for function '%s'?",
-											serverName,
-											call.Function.Name,
+								// check if matched MCP tool requires confirmation
+								if tool.Annotations != nil &&
+									tool.Annotations.DestructiveHint != nil &&
+									*tool.Annotations.DestructiveHint &&
+									!forceCallDestructiveTools {
+									okToRun = confirm(fmt.Sprintf(
+										"May I call tool '%s' from '%s' for function '%s'?",
+										call.Function.Name,
+										stripURLParams(serverURL),
+										fn,
+									))
+								} else {
+									okToRun = true
+								}
+
+								if okToRun {
+									if res, err := fetchToolCallResult(
+										ctx,
+										serverURL,
+										call.Function.Name,
+										call.Function.Arguments,
+									); err == nil {
+										fnResult := fmt.Sprintf(
+											"Tool call result of '%s':\n%s",
 											fn,
-										))
-									} else {
-										okToRun = true
-									}
+											prettify(res.Content),
+										)
 
-									if okToRun {
-										if res, err := fetchSmitheryToolCallResult(
-											ctx,
-											smitheryClient,
-											*smitheryProfileID, serverName,
-											call.Function.Name, call.Function.Arguments,
-										); err == nil {
-											fnResult := fmt.Sprintf(
-												"Tool call result of '%s':\n%s",
-												fn,
-												prettify(res.Content),
-											)
-
-											// print the result of execution
-											if showCallbackResults ||
-												verboseLevel(vbs) >= verboseMinimum {
-												output.printColored(
-													color.FgHiCyan,
-													"%s\n",
-													fnResult,
-												)
-											}
-
-											// print generated content
-											pastGenerations = appendUserMessageToPastGenerations(
-												pastGenerations,
+										// print the result of execution
+										if showCallbackResults ||
+											verboseLevel(vbs) >= verboseMinimum {
+											output.printColored(
+												color.FgHiCyan,
+												"%s\n",
 												fnResult,
 											)
-										} else {
-											return fmt.Errorf("failed to call smithery tool: %w", err)
 										}
-									} else {
-										output.printColored(
-											color.FgHiYellow,
-											"Skipped execution of smithery tool '%s/%s' for function '%s'.\n",
-											serverName,
-											call.Function.Name,
-											fn,
-										)
 
-										// append function call result (not called)
+										// print generated content
 										pastGenerations = appendUserMessageToPastGenerations(
 											pastGenerations,
-											fmt.Sprintf(
-												`User chose not to call function '%s'.`,
-												fn,
-											),
+											fnResult,
 										)
+									} else {
+										return fmt.Errorf("failed to call MCP tool: %w", err)
 									}
+								} else {
+									output.printColored(
+										color.FgHiYellow,
+										"Skipped execution of MCP tool '%s' from '%s' for function '%s'.\n",
+										call.Function.Name,
+										stripURLParams(serverURL),
+										fn,
+									)
+
+									// append function call result (not called)
+									pastGenerations = appendUserMessageToPastGenerations(
+										pastGenerations,
+										fmt.Sprintf(
+											`User chose not to call function '%s'.`,
+											fn,
+										),
+									)
 								}
 							} else {
 								// print generated content
@@ -606,10 +599,7 @@ func doGeneration(
 				localTools,
 				localToolCallbacks,
 				localToolCallbacksConfirm,
-				smitheryAPIKey,
-				smitheryClient,
-				smitheryProfileID,
-				smitheryTools,
+				mcpTools,
 				pastGenerations,
 				userAgent,
 				replaceHTTPURLsInPrompt,

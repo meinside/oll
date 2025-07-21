@@ -495,7 +495,7 @@ func convertPromptAndFiles(
 	}
 	for _, fp := range filepaths {
 		if opened, err := os.Open(*fp); err == nil {
-			defer opened.Close()
+			defer func() { _ = opened.Close() }()
 
 			fbase := filepath.Base(*fp)
 			if bytes, err := io.ReadAll(opened); err == nil {
@@ -552,7 +552,7 @@ func supportedImage(data []byte) (supported bool, err error) {
 func supportedImagePath(filepath string) (supported bool, err error) {
 	var f *os.File
 	if f, err = os.Open(filepath); err == nil {
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		var mimeType *mimetype.MIME
 		if mimeType, err = mimetype.DetectReader(f); err == nil {
@@ -581,7 +581,7 @@ func supportedMimeType(data []byte) (matchedMimeType string, supported bool, err
 func supportedMimeTypePath(filepath string) (matchedMimeType string, supported bool, err error) {
 	var f *os.File
 	if f, err = os.Open(filepath); err == nil {
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		var mimeType *mimetype.MIME
 		if mimeType, err = mimetype.DetectReader(f); err == nil {
@@ -841,14 +841,14 @@ func duplicated[V comparable](arrs ...[]V) (value V, duplicated bool) {
 // extract keys from given tools
 func keysFromTools(
 	localTools []api.Tool,
-	smitheryTools map[string][]*mcp.Tool,
-) (localToolKeys, smitheryToolKeys []string) {
+	mcpTools map[string][]*mcp.Tool,
+) (localToolKeys, mcpToolKeys []string) {
 	for _, tool := range localTools {
 		localToolKeys = append(localToolKeys, tool.Function.Name)
 	}
-	for _, tools := range smitheryTools {
+	for _, tools := range mcpTools {
 		for _, tool := range tools {
-			smitheryToolKeys = append(smitheryToolKeys, tool.Name)
+			mcpToolKeys = append(mcpToolKeys, tool.Name)
 		}
 	}
 
@@ -900,4 +900,9 @@ func appendModelResponseToPastGenerations(
 		}
 	}
 	return history
+}
+
+// strip url params
+func stripURLParams(url string) string {
+	return strings.Split(url, "?")[0]
 }

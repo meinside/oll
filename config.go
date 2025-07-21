@@ -18,8 +18,6 @@ type config struct {
 	TimeoutSeconds int `json:"timeout_seconds,omitempty"`
 
 	ReplaceHTTPURLTimeoutSeconds int `json:"replace_http_url_timeout_seconds,omitempty"`
-
-	SmitheryAPIKey *string `json:"smithery_api_key,omitempty"`
 }
 
 // read config from given filepath
