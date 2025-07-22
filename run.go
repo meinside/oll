@@ -125,7 +125,7 @@ func run(
 			}
 
 			// tools (MCP)
-			var allMCPTools map[string][]*mcp.Tool = nil // key: streamable http url, value: tools
+			var allMCPTools mcpConnectionsAndTools = nil // key: streamable http url, value: tools
 			if len(p.MCPTools.MCPStreamableURLs) > 0 {
 				for _, serverURL := range p.MCPTools.MCPStreamableURLs {
 					output.verbose(
@@ -135,34 +135,58 @@ func run(
 						stripURLParams(serverURL),
 					)
 
-					var fetchedTools []*mcp.Tool
-					if fetchedTools, err = fetchMCPTools(
-						context.TODO(),
-						serverURL,
-					); err == nil {
-						if allMCPTools == nil {
-							allMCPTools = map[string][]*mcp.Tool{}
-						}
-						allMCPTools[serverURL] = fetchedTools
+					// connect,
+					var mc *mcp.ClientSession
+					if mc, err = mcpConnect(context.TODO(), serverURL); err == nil {
+						// fetch tools,
+						var fetchedTools []*mcp.Tool
+						if fetchedTools, err = fetchMCPTools(
+							context.TODO(),
+							mc,
+						); err == nil {
+							if allMCPTools == nil {
+								allMCPTools = mcpConnectionsAndTools{}
+							}
+							allMCPTools[serverURL] = struct {
+								connection *mcp.ClientSession
+								tools      []*mcp.Tool
+							}{
+								connection: mc,
+								tools:      fetchedTools,
+							}
 
-						// check if there is any duplicated name of function
-						if value, duplicated := duplicated(
-							keysFromTools(localTools, allMCPTools),
-						); duplicated {
+							// check if there is any duplicated name of function
+							if value, duplicated := duplicated(
+								keysFromTools(localTools, allMCPTools),
+							); duplicated {
+								return 1, fmt.Errorf(
+									"duplicated function name in tools: '%s'",
+									value,
+								)
+							}
+						} else {
 							return 1, fmt.Errorf(
-								"duplicated function name in tools: '%s'",
-								value,
+								"failed to fetch tools from '%s': %w",
+								stripURLParams(serverURL),
+								err,
 							)
 						}
 					} else {
 						return 1, fmt.Errorf(
-							"failed to fetch tools from '%s': %w",
+							"failed to connect to MCP server '%s': %w",
 							stripURLParams(serverURL),
 							err,
 						)
 					}
 				}
 			}
+
+			// close all MCP connections
+			defer func() {
+				for _, connsAndTools := range allMCPTools {
+					_ = connsAndTools.connection.Close()
+				}
+			}()
 
 			return doGeneration(
 				context.TODO(),

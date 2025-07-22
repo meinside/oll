@@ -16,7 +16,6 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ollama/ollama/api"
 )
 
@@ -67,7 +66,7 @@ func doGeneration(
 	localTools []api.Tool,
 	localToolCallbacks map[string]string,
 	localToolCallbacksConfirm map[string]bool,
-	mcpTools map[string][]*mcp.Tool,
+	mcpConnsAndTools mcpConnectionsAndTools,
 	pastGenerations []api.Message,
 	userAgent *string,
 	replaceHTTPURLsInPrompt bool,
@@ -188,8 +187,8 @@ func doGeneration(
 	}
 	// (tools - MCP)
 	var ollamaTools []api.Tool = nil
-	for _, tools := range mcpTools {
-		if converted, err := mcpToOllamaTools(tools); err == nil {
+	for _, connsAndTools := range mcpConnsAndTools {
+		if converted, err := mcpToOllamaTools(connsAndTools.tools); err == nil {
 			for _, c := range converted {
 				ollamaTools = append(ollamaTools, *c)
 			}
@@ -412,8 +411,8 @@ func doGeneration(
 										),
 									})
 								}
-							} else if serverURL, tool, exists := mcpToolFrom(
-								mcpTools,
+							} else if serverURL, mc, tool, exists := mcpToolFrom(
+								mcpConnsAndTools,
 								call.Function.Name,
 							); exists {
 								// NOTE: avoid infinite loops
@@ -443,7 +442,7 @@ func doGeneration(
 								if okToRun {
 									if res, err := fetchToolCallResult(
 										ctx,
-										serverURL,
+										mc,
 										call.Function.Name,
 										call.Function.Arguments,
 									); err == nil {
@@ -599,7 +598,7 @@ func doGeneration(
 				localTools,
 				localToolCallbacks,
 				localToolCallbacksConfirm,
-				mcpTools,
+				mcpConnsAndTools,
 				pastGenerations,
 				userAgent,
 				replaceHTTPURLsInPrompt,
