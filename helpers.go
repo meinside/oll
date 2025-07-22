@@ -22,7 +22,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/fatih/color"
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ollama/ollama/api"
 	"github.com/tailscale/hujson"
 )
@@ -841,13 +840,13 @@ func duplicated[V comparable](arrs ...[]V) (value V, duplicated bool) {
 // extract keys from given tools
 func keysFromTools(
 	localTools []api.Tool,
-	mcpTools map[string][]*mcp.Tool,
+	mcpConnsAndTools mcpConnectionsAndTools,
 ) (localToolKeys, mcpToolKeys []string) {
 	for _, tool := range localTools {
 		localToolKeys = append(localToolKeys, tool.Function.Name)
 	}
-	for _, tools := range mcpTools {
-		for _, tool := range tools {
+	for _, connsAndTools := range mcpConnsAndTools {
+		for _, tool := range connsAndTools.tools {
 			mcpToolKeys = append(mcpToolKeys, tool.Name)
 		}
 	}

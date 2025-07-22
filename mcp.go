@@ -19,38 +19,36 @@ const (
 	mcpClientName = `oll/mcp`
 )
 
+// a map of MCP connections and tools
+type mcpConnectionsAndTools map[string]struct {
+	connection *mcp.ClientSession
+	tools      []*mcp.Tool
+}
+
 // get a matched server url and tool from given MCP tools and function name
 func mcpToolFrom(
-	tools map[string][]*mcp.Tool,
+	connsAndTools mcpConnectionsAndTools,
 	fnName string,
-) (serverURL string, tool mcp.Tool, exists bool) {
-	for serverURL, tools := range tools {
-		for _, tool := range tools {
+) (serverURL string, mc *mcp.ClientSession, tool mcp.Tool, exists bool) {
+	for serverURL, tools := range connsAndTools {
+		for _, tool := range tools.tools {
 			if tool != nil && tool.Name == fnName {
-				return serverURL, *tool, true
+				return serverURL, tools.connection, *tool, true
 			}
 		}
 	}
 
-	return "", mcp.Tool{}, false
+	return "", nil, mcp.Tool{}, false
 }
 
 // fetch function declarations from MCP server
 func fetchMCPTools(
 	ctx context.Context,
-	url string,
+	mc *mcp.ClientSession,
 ) (tools []*mcp.Tool, err error) {
-	var conn *mcp.ClientSession
-	if conn, err = mcpConnect(
-		ctx,
-		url,
-	); err == nil {
-		defer func() { _ = conn.Close() }()
-
-		var listed *mcp.ListToolsResult
-		if listed, err = conn.ListTools(ctx, &mcp.ListToolsParams{}); err == nil {
-			return listed.Tools, nil
-		}
+	var listed *mcp.ListToolsResult
+	if listed, err = mc.ListTools(ctx, &mcp.ListToolsParams{}); err == nil {
+		return listed.Tools, nil
 	}
 	return
 }
@@ -84,25 +82,17 @@ func mcpToOllamaTools(
 // fetch function result from MCP
 func fetchToolCallResult(
 	ctx context.Context,
-	url string,
+	mc *mcp.ClientSession,
 	fnName string, fnArgs map[string]any,
 ) (res *mcp.CallToolResult, err error) {
-	var conn *mcp.ClientSession
-	if conn, err = mcpConnect(
+	if res, err = mc.CallTool(
 		ctx,
-		url,
+		&mcp.CallToolParams{
+			Name:      fnName,
+			Arguments: fnArgs,
+		},
 	); err == nil {
-		defer func() { _ = conn.Close() }()
-
-		if res, err = conn.CallTool(
-			ctx,
-			&mcp.CallToolParams{
-				Name:      fnName,
-				Arguments: fnArgs,
-			},
-		); err == nil {
-			return res, nil
-		}
+		return res, nil
 	}
 
 	return
