@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/meinside/version-go"
@@ -19,26 +21,51 @@ const (
 	mcpClientName = `oll/mcp`
 )
 
+type mcpServerType string
+
+const (
+	mcpServerStreamable mcpServerType = "streamable"
+	mcpServerStdio      mcpServerType = "stdio"
+)
+
 // a map of MCP connections and tools
 type mcpConnectionsAndTools map[string]struct {
+	serverType mcpServerType
 	connection *mcp.ClientSession
 	tools      []*mcp.Tool
 }
 
 // get a matched server url and tool from given MCP tools and function name
 func mcpToolFrom(
-	connsAndTools mcpConnectionsAndTools,
+	mcpConnsAndTools mcpConnectionsAndTools,
 	fnName string,
-) (serverURL string, mc *mcp.ClientSession, tool mcp.Tool, exists bool) {
-	for serverURL, tools := range connsAndTools {
-		for _, tool := range tools.tools {
+) (serverKey string, serverType mcpServerType, mc *mcp.ClientSession, tool mcp.Tool, exists bool) {
+	for serverKey, connsAndTools := range mcpConnsAndTools {
+		for _, tool := range connsAndTools.tools {
 			if tool != nil && tool.Name == fnName {
-				return serverURL, tools.connection, *tool, true
+				return serverKey, connsAndTools.serverType, connsAndTools.connection, *tool, true
 			}
 		}
 	}
 
-	return "", nil, mcp.Tool{}, false
+	return "", "", nil, mcp.Tool{}, false
+}
+
+// extract keys from given tools
+func keysFromTools(
+	localTools []api.Tool,
+	mcpConnsAndTools mcpConnectionsAndTools,
+) (localToolKeys, mcpToolKeys []string) {
+	for _, tool := range localTools {
+		localToolKeys = append(localToolKeys, tool.Function.Name)
+	}
+	for _, connsAndTools := range mcpConnsAndTools {
+		for _, tool := range connsAndTools.tools {
+			mcpToolKeys = append(mcpToolKeys, tool.Name)
+		}
+	}
+
+	return
 }
 
 // fetch function declarations from MCP server
@@ -125,6 +152,38 @@ func mcpConnect(
 	return nil, err
 }
 
+// run MCP server with given `cmdline`, connect to it, start, initialize, and return the client
+func mcpRun(
+	ctx context.Context,
+	cmdline string,
+) (connection *mcp.ClientSession, err error) {
+	cmdline = expandPath(cmdline)
+
+	command, args, err := parseCommandline(cmdline)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to parse command line `%s` %w",
+			stripServerInfo(mcpServerStdio, cmdline),
+			err,
+		)
+	}
+
+	if connection, err = mcp.NewClient(
+		&mcp.Implementation{
+			Name:    mcpClientName,
+			Version: version.Build(version.OS | version.Architecture),
+		},
+		&mcp.ClientOptions{},
+	).Connect(
+		ctx,
+		mcp.NewCommandTransport(exec.Command(command, args...)),
+	); err == nil {
+		return connection, nil
+	}
+
+	return nil, err
+}
+
 const (
 	mcpDefaultTimeoutSeconds               = 120 // FIXME: ideally, should be 0 for keeping the connection
 	mcpDefaultDialTimeoutSeconds           = 10
@@ -157,4 +216,16 @@ func mcpHTTPClient() *http.Client {
 		}
 	}
 	return _mcpHTTPClient
+}
+
+// strip sensitive information from given server info
+func stripServerInfo(serverType mcpServerType, info string) string {
+	switch serverType {
+	case mcpServerStreamable:
+		return strings.Split(info, "?")[0]
+	case mcpServerStdio:
+		cmd, _, _ := parseCommandline(info)
+		return cmd
+	}
+	return info
 }
