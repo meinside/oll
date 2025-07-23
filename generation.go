@@ -411,7 +411,7 @@ func doGeneration(
 										),
 									})
 								}
-							} else if serverURL, mc, tool, exists := mcpToolFrom(
+							} else if serverKey, serverType, mc, tool, exists := mcpToolFrom(
 								mcpConnsAndTools,
 								call.Function.Name,
 							); exists {
@@ -432,7 +432,7 @@ func doGeneration(
 									okToRun = confirm(fmt.Sprintf(
 										"May I call tool '%s' from '%s' for function '%s'?",
 										call.Function.Name,
-										stripURLParams(serverURL),
+										stripServerInfo(serverType, serverKey),
 										fn,
 									))
 								} else {
@@ -475,7 +475,7 @@ func doGeneration(
 										color.FgHiYellow,
 										"Skipped execution of MCP tool '%s' from '%s' for function '%s'.\n",
 										call.Function.Name,
-										stripURLParams(serverURL),
+										stripServerInfo(serverType, serverKey),
 										fn,
 									)
 

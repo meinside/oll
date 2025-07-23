@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -24,6 +25,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/ollama/ollama/api"
 	"github.com/tailscale/hujson"
+	"mvdan.cc/sh/syntax"
 )
 
 const (
@@ -837,23 +839,6 @@ func duplicated[V comparable](arrs ...[]V) (value V, duplicated bool) {
 	return zero, false
 }
 
-// extract keys from given tools
-func keysFromTools(
-	localTools []api.Tool,
-	mcpConnsAndTools mcpConnectionsAndTools,
-) (localToolKeys, mcpToolKeys []string) {
-	for _, tool := range localTools {
-		localToolKeys = append(localToolKeys, tool.Function.Name)
-	}
-	for _, connsAndTools := range mcpConnsAndTools {
-		for _, tool := range connsAndTools.tools {
-			mcpToolKeys = append(mcpToolKeys, tool.Name)
-		}
-	}
-
-	return
-}
-
 // check if the past generations end with users's message,
 func historyEndsWithUsers(history []api.Message) bool {
 	if len(history) > 0 {
@@ -901,7 +886,38 @@ func appendModelResponseToPastGenerations(
 	return history
 }
 
-// strip url params
-func stripURLParams(url string) string {
-	return strings.Split(url, "?")[0]
+// parse commandline
+func parseCommandline(cmdline string) (command string, args []string, err error) {
+	parser := syntax.NewParser()
+
+	var node *syntax.File
+	if node, err = parser.Parse(strings.NewReader(cmdline), ""); err == nil {
+		var parts []string
+		syntax.Walk(node, func(node syntax.Node) bool {
+			switch x := node.(type) {
+			case *syntax.CallExpr:
+				printer := syntax.NewPrinter()
+				for _, word := range x.Args {
+					var buf bytes.Buffer
+					if err := printer.Print(&buf, word); err != nil {
+						log.Printf("failure while serializing command line: %s", err)
+						continue
+					}
+					parts = append(parts, buf.String())
+				}
+				return false
+			}
+			return true
+		})
+
+		if len(parts) > 0 {
+			return parts[0], parts[1:], nil
+		} else {
+			err = fmt.Errorf("there was no available command or arguments from the command line")
+		}
+	} else {
+		err = fmt.Errorf("failed to parse command line: %w", err)
+	}
+
+	return cmdline, nil, err
 }

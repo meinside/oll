@@ -126,58 +126,112 @@ func run(
 
 			// tools (MCP)
 			var allMCPTools mcpConnectionsAndTools = nil // key: streamable http url, value: tools
-			if len(p.MCPTools.MCPStreamableURLs) > 0 {
-				for _, serverURL := range p.MCPTools.MCPStreamableURLs {
-					output.verbose(
-						verboseMedium,
-						p.Verbose,
-						"fetching tools from '%s'...",
-						stripURLParams(serverURL),
-					)
+			for _, serverURL := range p.MCPTools.StreamableURLs {
+				output.verbose(
+					verboseMedium,
+					p.Verbose,
+					"fetching tools from '%s'...",
+					stripServerInfo(mcpServerStreamable, serverURL),
+				)
 
-					// connect,
-					var mc *mcp.ClientSession
-					if mc, err = mcpConnect(context.TODO(), serverURL); err == nil {
-						// fetch tools,
-						var fetchedTools []*mcp.Tool
-						if fetchedTools, err = fetchMCPTools(
-							context.TODO(),
-							mc,
-						); err == nil {
-							if allMCPTools == nil {
-								allMCPTools = mcpConnectionsAndTools{}
-							}
-							allMCPTools[serverURL] = struct {
-								connection *mcp.ClientSession
-								tools      []*mcp.Tool
-							}{
-								connection: mc,
-								tools:      fetchedTools,
-							}
+				// connect,
+				var mc *mcp.ClientSession
+				if mc, err = mcpConnect(context.TODO(), serverURL); err == nil {
+					// fetch tools,
+					var fetchedTools []*mcp.Tool
+					if fetchedTools, err = fetchMCPTools(
+						context.TODO(),
+						mc,
+					); err == nil {
+						if allMCPTools == nil {
+							allMCPTools = mcpConnectionsAndTools{}
+						}
+						allMCPTools[serverURL] = struct {
+							serverType mcpServerType
+							connection *mcp.ClientSession
+							tools      []*mcp.Tool
+						}{
+							serverType: mcpServerStreamable,
+							connection: mc,
+							tools:      fetchedTools,
+						}
 
-							// check if there is any duplicated name of function
-							if value, duplicated := duplicated(
-								keysFromTools(localTools, allMCPTools),
-							); duplicated {
-								return 1, fmt.Errorf(
-									"duplicated function name in tools: '%s'",
-									value,
-								)
-							}
-						} else {
+						// check if there is any duplicated name of function
+						if value, duplicated := duplicated(
+							keysFromTools(localTools, allMCPTools),
+						); duplicated {
 							return 1, fmt.Errorf(
-								"failed to fetch tools from '%s': %w",
-								stripURLParams(serverURL),
-								err,
+								"duplicated function name in tools: '%s'",
+								value,
 							)
 						}
 					} else {
 						return 1, fmt.Errorf(
-							"failed to connect to MCP server '%s': %w",
-							stripURLParams(serverURL),
+							"failed to fetch tools from '%s': %w",
+							stripServerInfo(mcpServerStreamable, serverURL),
 							err,
 						)
 					}
+				} else {
+					return 1, fmt.Errorf(
+						"failed to connect to MCP server '%s': %w",
+						stripServerInfo(mcpServerStreamable, serverURL),
+						err,
+					)
+				}
+			}
+			for _, cmd := range p.MCPTools.StdioCommands {
+				output.verbose(
+					verboseMedium,
+					p.Verbose,
+					"fetching tools from '%s'...",
+					stripServerInfo(mcpServerStdio, cmd),
+				)
+
+				// connect,
+				var mc *mcp.ClientSession
+				if mc, err = mcpRun(context.TODO(), cmd); err == nil {
+					// fetch tools,
+					var fetchedTools []*mcp.Tool
+					if fetchedTools, err = fetchMCPTools(
+						context.TODO(),
+						mc,
+					); err == nil {
+						if allMCPTools == nil {
+							allMCPTools = mcpConnectionsAndTools{}
+						}
+						allMCPTools[cmd] = struct {
+							serverType mcpServerType
+							connection *mcp.ClientSession
+							tools      []*mcp.Tool
+						}{
+							serverType: mcpServerStdio,
+							connection: mc,
+							tools:      fetchedTools,
+						}
+
+						// check if there is any duplicated name of function
+						if value, duplicated := duplicated(
+							keysFromTools(localTools, allMCPTools),
+						); duplicated {
+							return 1, fmt.Errorf(
+								"duplicated function name in tools: '%s'",
+								value,
+							)
+						}
+					} else {
+						return 1, fmt.Errorf(
+							"failed to fetch tools from '%s': %w",
+							stripServerInfo(mcpServerStdio, cmd),
+							err,
+						)
+					}
+				} else {
+					return 1, fmt.Errorf(
+						"failed to connect to MCP server '%s': %w",
+						stripServerInfo(mcpServerStdio, cmd),
+						err,
+					)
 				}
 			}
 

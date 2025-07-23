@@ -378,7 +378,7 @@ When the format string is omitted (`--tool-callbacks="YOUR_CALLBACK:@format"`), 
 
 ### Function Call with MCP
 
-### Streamable HTTP URLs
+#### Streamable HTTP URLs
 
 ```bash
 $ oll -m "mistral-small3.2:24b" \
@@ -423,6 +423,14 @@ $ oll -m "mistral-small3.2:24b" \
     }]' \
     --tool-callbacks="send_email:/path/to/send_email.sh" \
     --recurse-on-callback-results
+```
+
+#### Local MCP Servers with STDIO Pipings
+
+```bash
+$ oll -m "mistral-small3.2:24b" \
+    -p "hello my friend, my name is meinside" \
+    --mcp-stdio-command="~/tmp/some-mcp-servers/hello --stdio --title 'hello world'"
 ```
 
 ### Fetch URL Contents from the Prompt

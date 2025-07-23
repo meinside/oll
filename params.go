@@ -53,7 +53,8 @@ type params struct {
 
 	// tools (MCP)
 	MCPTools struct {
-		MCPStreamableURLs []string `long:"mcp-streamable-url" description:"Streamable URL of MCP server for function call (can be used multiple times)"`
+		StreamableURLs []string `long:"mcp-streamable-url" description:"Streamable URL of MCP server for function call (can be used multiple times)"`
+		StdioCommands  []string `long:"mcp-stdio-command" description:"Commands of local stdio MCP Tools (can be used multiple times)"`
 	} `group:"Tools (MCP)"`
 
 	// list models
