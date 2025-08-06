@@ -80,8 +80,8 @@ $ curl https://api.coincap.io/v2/assets \
 You can generate with thinking with [models which support thinking](https://ollama.com/search?c=thinking):
 
 ```bash
-$ oll -m "qwen3:8b" -p "what is the earth escape velocity?" --with-thinking
-$ oll -m "qwen3:8b" -p "what is the three laws of newton?" --with-thinking --hide-reasoning
+$ oll -m "gpt-oss:20b" -p "what is the earth escape velocity?" --with-thinking
+$ oll -m "gpt-oss:20b" -p "what is the three laws of newton?" --with-thinking --hide-reasoning
 ```
 
 ### JSON Output
