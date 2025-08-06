@@ -200,7 +200,9 @@ func doGeneration(
 		req.Tools = append(req.Tools, ollamaTools...)
 	}
 	// (thinking)
-	req.Think = ptr(withThinking)
+	req.Think = &api.ThinkValue{
+		Value: withThinking,
+	}
 
 	// (history)
 	req.Messages = append(req.Messages, pastGenerations...)
