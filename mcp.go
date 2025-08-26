@@ -19,6 +19,8 @@ import (
 
 const (
 	mcpClientName = `oll/mcp`
+
+	mcpMaxRetries = 3
 )
 
 type mcpServerType string
@@ -130,12 +132,11 @@ func mcpConnect(
 	ctx context.Context,
 	url string,
 ) (connection *mcp.ClientSession, err error) {
-	streamable := mcp.NewStreamableClientTransport(
-		url,
-		&mcp.StreamableClientTransportOptions{
-			HTTPClient: mcpHTTPClient(),
-		},
-	)
+	streamable := &mcp.StreamableClientTransport{
+		Endpoint:   url,
+		HTTPClient: mcpHTTPClient(),
+		MaxRetries: mcpMaxRetries,
+	}
 
 	client := mcp.NewClient(
 		&mcp.Implementation{
@@ -145,7 +146,11 @@ func mcpConnect(
 		&mcp.ClientOptions{},
 	)
 
-	if connection, err = client.Connect(ctx, streamable); err == nil {
+	if connection, err = client.Connect(
+		ctx,
+		streamable,
+		&mcp.ClientSessionOptions{},
+	); err == nil {
 		return connection, nil
 	}
 
@@ -176,7 +181,10 @@ func mcpRun(
 		&mcp.ClientOptions{},
 	).Connect(
 		ctx,
-		mcp.NewCommandTransport(exec.Command(command, args...)),
+		&mcp.CommandTransport{
+			Command: exec.Command(command, args...),
+		},
+		&mcp.ClientSessionOptions{},
 	); err == nil {
 		return connection, nil
 	}
@@ -185,7 +193,6 @@ func mcpRun(
 }
 
 const (
-	mcpDefaultTimeoutSeconds               = 120 // FIXME: ideally, should be 0 for keeping the connection
 	mcpDefaultDialTimeoutSeconds           = 10
 	mcpDefaultKeepAliveSeconds             = 60
 	mcpDefaultIdleTimeoutSeconds           = 180
