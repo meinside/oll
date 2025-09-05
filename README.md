@@ -467,7 +467,7 @@ You can print [embeddings](https://ollama.com/search?c=embedding) of a given pro
 ```bash
 # generate with an embedding model
 $ oll -e \
-    -m nomic-embed-text \
+    -m embeddinggemma \
     -p "this is an apple"
 ```
 
