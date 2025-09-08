@@ -10,7 +10,7 @@ require (
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jwalton/go-supportscolor v1.2.0
 	github.com/meinside/version-go v0.0.3
-	github.com/modelcontextprotocol/go-sdk v0.3.1
+	github.com/modelcontextprotocol/go-sdk v0.4.0
 	github.com/ollama/ollama v0.11.10
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	mvdan.cc/sh v2.6.4+incompatible
@@ -25,6 +25,6 @@ require (
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/term v0.34.0 // indirect
 )
