@@ -10,15 +10,15 @@ require (
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jwalton/go-supportscolor v1.2.0
 	github.com/meinside/version-go v0.0.3
-	github.com/modelcontextprotocol/go-sdk v0.5.0
-	github.com/ollama/ollama v0.12.0
+	github.com/modelcontextprotocol/go-sdk v0.7.0
+	github.com/ollama/ollama v0.12.2
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	mvdan.cc/sh v2.6.4+incompatible
 )
 
 require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
-	github.com/google/jsonschema-go v0.2.3 // indirect
+	github.com/google/jsonschema-go v0.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
