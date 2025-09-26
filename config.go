@@ -15,6 +15,8 @@ type config struct {
 	DefaultModel      *string `json:"default_model,omitempty"`
 	SystemInstruction *string `json:"system_instruction,omitempty"`
 
+	OllamaAPIKey *string `json:"ollama_api_key,omitempty"`
+
 	TimeoutSeconds int `json:"timeout_seconds,omitempty"`
 
 	ReplaceHTTPURLTimeoutSeconds int `json:"replace_http_url_timeout_seconds,omitempty"`

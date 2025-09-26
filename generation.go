@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"text/template"
@@ -334,6 +335,7 @@ func doGeneration(
 							if callbackPath, exists := localToolCallbacks[call.Function.Name]; exists {
 								// with local tools,
 								fnCallback, okToRun := checkCallbackPath(
+									conf,
 									output,
 									callbackPath,
 									localToolCallbacksConfirm,
@@ -781,10 +783,13 @@ func doEmbeddingsGeneration(
 const (
 	fnCallbackStdin     = `@stdin`
 	fnCallbackFormatter = `@format`
+
+	fnCallbackWebSearch = `@web-search`
 )
 
 // check if given `callbackPath` is executable
 func checkCallbackPath(
+	conf config,
 	output *outputWriter,
 	callbackPath string,
 	confirmToolCallbacks map[string]bool,
@@ -831,6 +836,42 @@ func checkCallbackPath(
 				}
 			}
 		}
+	} else if strings.HasPrefix(callbackPath, fnCallbackWebSearch) { // @web-search
+		okToRun = true
+
+		// search from web with https://ollama.com/blog/web-search
+		fnCallback = func() (string, error) {
+			var ollamaAPIKey string
+			if conf.OllamaAPIKey != nil {
+				ollamaAPIKey = *conf.OllamaAPIKey
+			}
+			if fromEnv := os.Getenv("OLLAMA_API_KEY"); len(fromEnv) > 0 {
+				ollamaAPIKey = fromEnv
+			}
+
+			searchParamQuery := defaultSearchParamQuery
+			if title, exists := strings.CutPrefix(callbackPath, fnCallbackWebSearch+"="); exists {
+				searchParamQuery = title
+			}
+
+			if len(ollamaAPIKey) > 0 {
+				if query, exists := fnCall.Arguments[searchParamQuery]; exists {
+					if query, ok := query.(string); ok {
+						if searched, err := webSearch(ollamaAPIKey, query); err == nil {
+							return prettify(searched, false), nil
+						} else {
+							return "", fmt.Errorf("failed to search from web: %w", err)
+						}
+					} else {
+						return "", fmt.Errorf("invalid `%s` type from function arguments: %s", searchParamQuery, prettify(fnCall.Arguments, true))
+					}
+				} else {
+					return "", fmt.Errorf("missing `%s` from function arguments: %s", searchParamQuery, prettify(fnCall.Arguments, true))
+				}
+			} else {
+				return "", fmt.Errorf("missing `OLLAMA_API_KEY` environment variable and/or `ollama_api_key` config field")
+			}
+		}
 	} else { // ordinary path of binary/script:
 		// ask for confirmation
 		if confirmNeeded, exists := confirmToolCallbacks[fnCall.Name]; exists && confirmNeeded && !forceCallDestructiveTools {
@@ -859,5 +900,5 @@ func checkCallbackPath(
 		}
 	}
 
-	return
+	return fnCallback, okToRun
 }
