@@ -9,4 +9,7 @@
   // network timeout seconds (for fetching urls, and/or generating responses)
   //"timeout_seconds": 300,
   //"replace_http_url_timeout_seconds": 10,
+
+  // OLLAMA_API_KEY
+  //"ollama_api_key": "abcd1234567890efgh.ABCDEFGHIJKLMNOPQRSTUVWXYZ-1234",
 }

@@ -921,3 +921,63 @@ func parseCommandline(cmdline string) (command string, args []string, err error)
 
 	return cmdline, nil, err
 }
+
+// SearchResultItem is an item of searched result from https://ollama.com/api/web_search
+type SearchResultItem struct {
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Content string `json:"content"`
+}
+
+// SearchResult is a list of SearchResultItem
+type SearchResult struct {
+	Results []SearchResultItem `json:"results"`
+}
+
+const defaultSearchParamQuery = `query`
+
+// webSearch searches for `query` on the web using the specified Ollama web search API.
+//
+// https://ollama.com/blog/web-search
+func webSearch(ollamaAPIKey string, query string) (results []SearchResultItem, err error) {
+	httpClient := &http.Client{
+		Timeout: defaultFetchURLTimeoutSeconds * time.Second,
+	}
+
+	jsonBody, err := json.Marshal(map[string]string{
+		defaultSearchParamQuery: query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	// request body and header
+	req, err := http.NewRequest("POST", "https://ollama.com/api/web_search", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new request: %w", err)
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", ollamaAPIKey))
+	req.Header.Set("Content-Type", "application/json")
+
+	// perform request
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform HTTP request: %w", err)
+	}
+
+	// read response
+	defer resp.Body.Close() // nolint:errcheck
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+	var apiResponse SearchResult
+	err = json.Unmarshal(bodyBytes, &apiResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal API response: %w", err)
+	}
+	return apiResponse.Results, nil
+}

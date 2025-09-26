@@ -302,6 +302,7 @@ Here are predefined callback names:
 
 * `@stdin`: Ask the user for standard input.
 * `@format`: Print a formatted string with the resulting function arguments.
+* `@web-search`: Search for given `query` parameter from the [web](https://ollama.com/blog/web-search).
 * … (more to be added)
 
 ##### @stdin
@@ -374,7 +375,39 @@ $ oll -m "mistral-small3.2:24b" \
     --show-callback-results 2>/dev/null
 ```
 
-When the format string is omitted (`--tool-callbacks="YOUR_CALLBACK:@format"`), it will be printed as a JSON string.
+When the format string is omitted (eg. `--tool-callbacks="YOUR_CALLBACK:@format"`), it will be formatted as a JSON string.
+
+##### @web-search
+
+With `--tool-callbacks="YOUR_CALLBACK:@web-search=SEARCH_QUERY_NAME"`, it will search for the given query parameter titled `SEARCH_QUERY_NAME` from the [web](https://ollama.com/blog/web-search) and return the results.
+
+```bash
+$ oll -m "mistral-small3.2:24b" \
+    -p "search for 'the answer to life, the universe, and everything' from the web" \
+    --tools='[
+        {
+            "type": "function",
+            "function": {
+                "name": "search_from_web",
+                "description": "this function searchs for given query from the web",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "query": {
+                            "type": "STRING",
+                            "description": "the query for search",
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        }
+    ]' \
+    --tool-callbacks="search_from_web:@web-search=query" \
+    --recurse-on-callback-results
+```
+
+When the title of the query parameter is omitted (eg. `--tool-callbacks="YOUR_CALLBACK:@web-search"`), `query` will be the default value.
 
 ### Function Call with MCP
 
