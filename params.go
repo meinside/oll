@@ -82,12 +82,12 @@ type params struct {
 	Verbose []bool `short:"v" long:"verbose" description:"Show verbose logs (can be used multiple times)"`
 }
 
-// check if prompt is given in the params
+// hasPrompt checks if prompt is given in the params.
 func (p *params) hasPrompt() bool {
 	return p.Generation.Prompt != nil && len(*p.Generation.Prompt) > 0
 }
 
-// check if any task is requested
+// taskRequested checks if any task is requested.
 //
 // FIXME: TODO: need to be fixed whenever a new task is added
 func (p *params) taskRequested() bool {
@@ -97,7 +97,7 @@ func (p *params) taskRequested() bool {
 		p.ShowVersion
 }
 
-// check if multiple tasks are requested
+// multipleTaskRequested checks if multiple tasks are requested.
 //
 // FIXME: TODO: need to be fixed whenever a new task is added
 func (p *params) multipleTaskRequested() bool {

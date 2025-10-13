@@ -37,7 +37,7 @@ Respond to user messages according to the following principles:
 	defaultUserAgent              = `oll/fetcher`
 )
 
-// run the application with params
+// run the application with params.
 func run(
 	output *outputWriter,
 	parser *flags.Parser,
@@ -294,7 +294,7 @@ func run(
 	// should not reach here
 }
 
-// generate a default system instruction with given params
+// defaultSystemInstruction generates a default system instruction with given params.
 func defaultSystemInstruction(p params) string {
 	datetime := time.Now().Format("2006-01-02 15:04:05 MST (Mon)")
 	hostname, _ := os.Hostname()

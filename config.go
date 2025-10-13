@@ -22,7 +22,7 @@ type config struct {
 	ReplaceHTTPURLTimeoutSeconds int `json:"replace_http_url_timeout_seconds,omitempty"`
 }
 
-// read config from given filepath
+// readConfig reads config from given filepath.
 func readConfig(
 	configFilepath string,
 ) (conf config, err error) {
@@ -48,7 +48,7 @@ func readConfig(
 	return conf, err
 }
 
-// resolve config filepath
+// resolveConfigFilepath resolves config filepath.
 func resolveConfigFilepath(
 	configFilepath *string,
 ) string {
