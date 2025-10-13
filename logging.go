@@ -25,7 +25,7 @@ const (
 	verboseMaximum verbosity = iota
 )
 
-// check level of verbosity
+// verboseLevel checks level of verbosity.
 func verboseLevel(
 	verbosityFromParams []bool,
 ) verbosity {
@@ -45,27 +45,27 @@ type outputWriter struct {
 	endsWithNewLine bool
 }
 
-// generate a new output writer
+// newOutputWriter generates a new output writer.
 func newOutputWriter() *outputWriter {
 	return &outputWriter{
 		endsWithNewLine: true,
 	}
 }
 
-// force add a new line
+// println force-adds a new line.
 func (w *outputWriter) println() {
 	fmt.Println()
 	w.endsWithNewLine = true
 }
 
-// make sure stdout ends with new line
+// makeSureToEndWithNewLine makes sure stdout ends with a new line.
 func (w *outputWriter) makeSureToEndWithNewLine() {
 	if !w.endsWithNewLine {
 		w.println()
 	}
 }
 
-// print given string to stdout with color (if possible)
+// printColored prints given string to stdout with color (if possible).
 func (w *outputWriter) printColored(
 	c color.Attribute,
 	format string,
@@ -83,7 +83,7 @@ func (w *outputWriter) printColored(
 	w.endsWithNewLine = strings.HasSuffix(formatted, "\n")
 }
 
-// print given string to stderr with color (if possible)
+// errorColored prints given string to stderr with color (if possible).
 func (w *outputWriter) errorColored(
 	c color.Attribute,
 	format string,
@@ -101,7 +101,7 @@ func (w *outputWriter) errorColored(
 	w.endsWithNewLine = strings.HasSuffix(formatted, "\n")
 }
 
-// print given string to stdout (will add a new line if there isn't)
+// print given string to stdout (will add a new line if there isn't).
 func (w *outputWriter) print(
 	level verbosity,
 	format string,
@@ -128,7 +128,7 @@ func (w *outputWriter) print(
 	)
 }
 
-// print verbose message (will add a new line if there isn't)
+// print verbose message (will add a new line if there isn't).
 //
 // (only when the level of given `verbosityFromParams` is greater or equal to `targetLevel`)
 func (w *outputWriter) verbose(
@@ -148,7 +148,7 @@ func (w *outputWriter) verbose(
 	}
 }
 
-// print given string to stderr and append a new line if there isn't
+// errWithNewlineAppended prints given string to stderr and appends a new line if there isn't.
 func (w *outputWriter) errWithNewlineAppended(
 	c color.Attribute,
 	format string,
@@ -165,7 +165,7 @@ func (w *outputWriter) errWithNewlineAppended(
 	)
 }
 
-// print given warning string to stderr (will add a new line if there isn't)
+// warn prints given warning string to stderr (will add a new line if there isn't).
 func (w *outputWriter) warn(
 	format string,
 	a ...any,
@@ -173,7 +173,7 @@ func (w *outputWriter) warn(
 	w.errWithNewlineAppended(color.FgMagenta, format, a...)
 }
 
-// print given error string to stderr (will add a new line if there isn't)
+// error prints given error string to stderr (will add a new line if there isn't).
 func (w *outputWriter) error(
 	format string,
 	a ...any,
@@ -181,7 +181,7 @@ func (w *outputWriter) error(
 	w.errWithNewlineAppended(color.FgRed, format, a...)
 }
 
-// print help message before os.Exit()
+// printHelpBeforeExit prints help message before os.Exit().
 func (w *outputWriter) printHelpBeforeExit(
 	code int,
 	parser *flags.Parser,
@@ -191,7 +191,7 @@ func (w *outputWriter) printHelpBeforeExit(
 	return code
 }
 
-// print error before os.Exit()
+// printErrorBeforeExit prints error before os.Exit().
 func (w *outputWriter) printErrorBeforeExit(
 	code int,
 	format string,
@@ -204,7 +204,7 @@ func (w *outputWriter) printErrorBeforeExit(
 	return code
 }
 
-// prettify given thing in JSON format
+// prettify given thing in JSON format.
 func prettify(
 	v any,
 	flatten ...bool,

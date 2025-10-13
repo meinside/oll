@@ -35,7 +35,7 @@ const (
 	defaultEmbeddingsChunkOverlappedSize uint = 64
 )
 
-// return a newly created ollama api client
+// newOllamaClient returns a newly created ollama api client.
 func newOllamaClient() (*api.Client, error) {
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
@@ -45,7 +45,7 @@ func newOllamaClient() (*api.Client, error) {
 	return client, nil
 }
 
-// generate text with given things
+// doGeneration generates text with given things.
 //
 // https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
 func doGeneration(
@@ -614,7 +614,7 @@ func doGeneration(
 	}
 }
 
-// list models
+// doListModels lists available models.
 //
 // https://github.com/ollama/ollama/blob/main/docs/api.md#list-local-models
 func doListModels(
@@ -685,7 +685,7 @@ func doListModels(
 	return 0, nil
 }
 
-// generate embeddings
+// doEmbeddingsGeneration generates embeddings.
 //
 // https://github.com/ollama/ollama/blob/main/docs/api.md#generate-embeddings
 func doEmbeddingsGeneration(
@@ -787,7 +787,7 @@ const (
 	fnCallbackWebSearch = `@web-search`
 )
 
-// check if given `callbackPath` is executable
+// checkCallbackPath checks if given `callbackPath` is runnable or not.
 func checkCallbackPath(
 	conf config,
 	output *outputWriter,

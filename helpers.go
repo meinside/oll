@@ -73,7 +73,7 @@ func init() {
 	}
 }
 
-// standardize given JSON (JWCC) bytes
+// standardizeJSON standardizes given JSON (JWCC) bytes.
 func standardizeJSON(b []byte) ([]byte, error) {
 	ast, err := hujson.Parse(b)
 	if err != nil {
@@ -84,7 +84,7 @@ func standardizeJSON(b []byte) ([]byte, error) {
 	return ast.Pack(), nil
 }
 
-// check if given directory should be ignored
+// ignoredDirectory checks if given directory should be ignored or not.
 func ignoredDirectory(
 	output *outputWriter,
 	path string,
@@ -100,7 +100,7 @@ func ignoredDirectory(
 	return false
 }
 
-// check if given file should be ignored
+// ignoredFile checks if given file should be ignored or not.
 func ignoredFile(
 	output *outputWriter,
 	path string,
@@ -129,7 +129,7 @@ func ignoredFile(
 	return false
 }
 
-// return all files' paths in the given directory
+// filesInDir returns all files' paths in the given directory.
 func filesInDir(
 	output *outputWriter,
 	dir string,
@@ -169,7 +169,7 @@ func filesInDir(
 	return files, err
 }
 
-// expand given filepaths (expand directories with their sub files)
+// expandFilepaths expands given filepaths (expands directories with their sub files).
 func expandFilepaths(
 	output *outputWriter,
 	p params,
@@ -240,7 +240,7 @@ func expandFilepaths(
 	return filtered, nil
 }
 
-// replace all HTTP URLs in `prompt` to the content of each URL.
+// replaceURLsInPrompt replaces all HTTP URLs in `prompt` to the content of each URL.
 //
 // files that were not converted to text will be returned as `files`.
 func replaceURLsInPrompt(
@@ -309,7 +309,7 @@ func replaceURLsInPrompt(
 	return prompt, files
 }
 
-// fetch the content from given url and convert it to text for prompting.
+// fetchContent fetches the content from given url and converts it to text for prompting.
 func fetchContent(
 	output *outputWriter,
 	timeoutSeconds int,
@@ -423,7 +423,7 @@ func fetchContent(
 	return converted, contentType, err
 }
 
-// remove consecutive empty lines for compacting prompt lines
+// removeConsecutiveEmptyLines removes consecutive empty lines for compacting prompt lines.
 func removeConsecutiveEmptyLines(input string) string {
 	// trim each line
 	trimmed := []string{}
@@ -437,7 +437,7 @@ func removeConsecutiveEmptyLines(input string) string {
 	return regex.ReplaceAllString(input, "\n")
 }
 
-// check if given HTTP content type is a supported text type
+// supportedTextContentType checks if given HTTP content type is a supported text type or not.
 func supportedTextContentType(contentType string) bool {
 	return func(contentType string) bool {
 		switch {
@@ -451,13 +451,13 @@ func supportedTextContentType(contentType string) bool {
 	}(contentType)
 }
 
-// get pointer of given value
+// ptr returns a pointer to the given value.
 func ptr[T any](v T) *T {
 	val := v
 	return &val
 }
 
-// get unique elements of given slice of pointers
+// uniqPtrs gets unique elements of given slice of pointers.
 func uniqPtrs[T comparable](slice []*T) []*T {
 	keys := map[T]bool{}
 	list := []*T{}
@@ -470,7 +470,7 @@ func uniqPtrs[T comparable](slice []*T) []*T {
 	return list
 }
 
-// convert given prompt & files for generation
+// convertPromptAndFiles converts given prompt & files for generation.
 func convertPromptAndFiles(
 	prompt string,
 	filesInPrompt map[string][]byte,
@@ -537,7 +537,7 @@ func convertPromptAndFiles(
 	return fmt.Sprintf("%s%s", strings.Join(contexts, "\n"), prompt), images, nil
 }
 
-// check if given image data is supported or not
+// supportedImage checks if given image data is supported or not.
 func supportedImage(data []byte) (supported bool, err error) {
 	var mimeType *mimetype.MIME
 	if mimeType, err = mimetype.DetectReader(bytes.NewReader(data)); err == nil {
@@ -549,7 +549,7 @@ func supportedImage(data []byte) (supported bool, err error) {
 	return false, err
 }
 
-// detect and return whether given path is an image
+// supportedImagePath detects and returns whether given path is an image or not.
 func supportedImagePath(filepath string) (supported bool, err error) {
 	var f *os.File
 	if f, err = os.Open(filepath); err == nil {
@@ -566,7 +566,7 @@ func supportedImagePath(filepath string) (supported bool, err error) {
 	return false, err
 }
 
-// detect and return the matched mime type of given bytes data and whether it's supported or not.
+// supportedMimeType detects the matched mime type of given bytes data, and returns whether it's supported or not.
 func supportedMimeType(data []byte) (matchedMimeType string, supported bool, err error) {
 	var mimeType *mimetype.MIME
 	if mimeType, err = mimetype.DetectReader(bytes.NewReader(data)); err == nil {
@@ -578,7 +578,7 @@ func supportedMimeType(data []byte) (matchedMimeType string, supported bool, err
 	return http.DetectContentType(data), false, err
 }
 
-// detect and return the matched mime type of given path and whether it's supported or not.
+// supportedMimeTypePath detects the matched mime type of given path, and returns whether it's supported or not.
 func supportedMimeTypePath(filepath string) (matchedMimeType string, supported bool, err error) {
 	var f *os.File
 	if f, err = os.Open(filepath); err == nil {
@@ -595,7 +595,7 @@ func supportedMimeTypePath(filepath string) (matchedMimeType string, supported b
 	return "", false, err
 }
 
-// check if given file's mime type is matched and supported
+// checkMimeType checks if given file's mime type is matched and supported.
 func checkMimeType(mimeType *mimetype.MIME) (matched string, supported bool) {
 	return func(mimeType *mimetype.MIME) (matchedMimeType string, supportedMimeType bool) {
 		matchedMimeType = mimeType.String() // fallback
@@ -736,7 +736,7 @@ func ChunkText(
 	}, nil
 }
 
-// expand given path
+// expandPath expands given path.
 func expandPath(path string) string {
 	// handle `~/*`,
 	if strings.HasPrefix(path, "~/") {
@@ -759,7 +759,7 @@ func expandPath(path string) string {
 	return path
 }
 
-// run executable with given args and return its result
+// runExecutable runs executable with given args and return its result.
 func runExecutable(
 	execPath string,
 	args map[string]any,
@@ -793,7 +793,7 @@ func runExecutable(
 	return string(output), nil
 }
 
-// confirm with the given prompt (y/n)
+// confirm with the given prompt (y/n).
 func confirm(prompt string) bool {
 	reader := bufio.NewReader(os.Stdin)
 	for {
@@ -817,14 +817,14 @@ func confirm(prompt string) bool {
 	}
 }
 
-// read user input from stdin
+// readFromStdin reads user input from stdin.
 func readFromStdin(prompt string) (string, error) {
 	fmt.Printf("%s: ", prompt)
 	reader := bufio.NewReader(os.Stdin)
 	return reader.ReadString('\n')
 }
 
-// check if there is any duplicated value between given arrays
+// duplicated checks if there is any duplicated value between given elements.
 func duplicated[V comparable](arrs ...[]V) (value V, duplicated bool) {
 	pool := map[V]struct{}{}
 	for _, arr := range arrs {
@@ -839,7 +839,7 @@ func duplicated[V comparable](arrs ...[]V) (value V, duplicated bool) {
 	return zero, false
 }
 
-// check if the past generations end with users's message,
+// historyEndsWithUsers checks if the past generations end with users's message.
 func historyEndsWithUsers(history []api.Message) bool {
 	if len(history) > 0 {
 		last := history[len(history)-1]
@@ -849,7 +849,7 @@ func historyEndsWithUsers(history []api.Message) bool {
 	return false
 }
 
-// append a user message to the past generations
+// appendUserMessageToPastGenerations appends a user message to the past generations.
 func appendUserMessageToPastGenerations(
 	history []api.Message,
 	message string,
@@ -860,7 +860,7 @@ func appendUserMessageToPastGenerations(
 	})
 }
 
-// append a model response to the past generations
+// appendModelResponseToPastGenerations appends a model response to the past generations.
 func appendModelResponseToPastGenerations(
 	history []api.Message,
 	generated string,
@@ -886,7 +886,7 @@ func appendModelResponseToPastGenerations(
 	return history
 }
 
-// parse commandline
+// parseCommandline parses given commandline.
 func parseCommandline(cmdline string) (command string, args []string, err error) {
 	parser := syntax.NewParser()
 

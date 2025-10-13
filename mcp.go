@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/meinside/version-go"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ollama/ollama/api"
@@ -37,7 +38,7 @@ type mcpConnectionsAndTools map[string]struct {
 	tools      []*mcp.Tool
 }
 
-// get a matched server url and tool from given MCP tools and function name
+// mcpToolFrom gets a matched server url and tool from given MCP tools and function name.
 func mcpToolFrom(
 	mcpConnsAndTools mcpConnectionsAndTools,
 	fnName string,
@@ -53,7 +54,7 @@ func mcpToolFrom(
 	return "", "", nil, mcp.Tool{}, false
 }
 
-// extract keys from given tools
+// keysFromTools extracts keys from given tools.
 func keysFromTools(
 	localTools []api.Tool,
 	mcpConnsAndTools mcpConnectionsAndTools,
@@ -67,10 +68,10 @@ func keysFromTools(
 		}
 	}
 
-	return
+	return localToolKeys, mcpToolKeys
 }
 
-// fetch function declarations from MCP server
+// fetchMCPTools fetches function declarations from the MCP server.
 func fetchMCPTools(
 	ctx context.Context,
 	mc *mcp.ClientSession,
@@ -79,10 +80,12 @@ func fetchMCPTools(
 	if listed, err = mc.ListTools(ctx, &mcp.ListToolsParams{}); err == nil {
 		return listed.Tools, nil
 	}
-	return
+	return tools, err
 }
 
-// convert MCP tools to Ollama tools
+// mcpToOllamaTools converts given MCP tools `from` to Ollama tools.
+//
+// InputSchema value of each mcp.Tool should be in type: `jsonschema.Schema` or `map[string]any`.
 func mcpToOllamaTools(
 	from []*mcp.Tool,
 ) (to []*api.Tool, err error) {
@@ -96,19 +99,28 @@ func mcpToOllamaTools(
 				Description: f.Description,
 			},
 		}
-		if marshalled, err := f.InputSchema.MarshalJSON(); err == nil {
-			if err := json.Unmarshal(marshalled, &to[i].Function.Parameters); err != nil {
-				return nil, fmt.Errorf("could not convert json to function parameters: %w", err)
+		if inputSchema, ok := f.InputSchema.(jsonschema.Schema); ok {
+			if marshalled, err := inputSchema.MarshalJSON(); err == nil {
+				var schema map[string]any
+				if err := json.Unmarshal(marshalled, &schema); err == nil {
+					to[i].Items = schema
+				} else {
+					return nil, fmt.Errorf("could not convert json to map: %w", err)
+				}
+			} else {
+				return nil, fmt.Errorf("could not convert input schema to json: %w", err)
 			}
+		} else if inputSchema, ok := f.InputSchema.(map[string]any); ok {
+			to[i].Items = inputSchema
 		} else {
-			return nil, fmt.Errorf("could not convert input schema to json: %w", err)
+			return nil, fmt.Errorf("tools[%d].InputSchema is not in type `jsonschema.Schema` or `map[string]any`: %T", i, f.InputSchema)
 		}
 	}
 
 	return to, nil
 }
 
-// fetch function result from MCP
+// fetchToolCallResult fetches function result from MCP.
 func fetchToolCallResult(
 	ctx context.Context,
 	mc *mcp.ClientSession,
@@ -124,10 +136,10 @@ func fetchToolCallResult(
 		return res, nil
 	}
 
-	return
+	return res, err
 }
 
-// connect to MCP server, start, initialize, and return the client
+// mcpConnect connects to MCP server, starts, initializes, and returns the client.
 func mcpConnect(
 	ctx context.Context,
 	url string,
@@ -157,7 +169,8 @@ func mcpConnect(
 	return nil, err
 }
 
-// run MCP server with given `cmdline`, connect to it, start, initialize, and return the client
+// mcpRun launches MCP server with given `cmdline` and connects to it,
+// then starts, initializes, and returns the client.
 func mcpRun(
 	ctx context.Context,
 	cmdline string,
@@ -204,7 +217,7 @@ const (
 // for reusing http client
 var _mcpHTTPClient *http.Client
 
-// helper function for generating a http client
+// mcpHTTPClient generates a http client for MCP connection.
 func mcpHTTPClient() *http.Client {
 	if _mcpHTTPClient == nil {
 		_mcpHTTPClient = &http.Client{
@@ -225,7 +238,7 @@ func mcpHTTPClient() *http.Client {
 	return _mcpHTTPClient
 }
 
-// strip sensitive information from given server info
+// stripServerInfo strips sensitive information from given server info.
 func stripServerInfo(serverType mcpServerType, info string) string {
 	switch serverType {
 	case mcpServerStreamable:
