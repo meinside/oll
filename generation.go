@@ -678,7 +678,7 @@ func doListModels(
 	} else {
 		output.printColored(
 			color.FgHiRed,
-			"no local models were found.",
+			"no local models were found.\n",
 		)
 	}
 
