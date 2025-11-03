@@ -488,7 +488,7 @@ You can use [vision models](https://ollama.com/search?c=vision) with `-m` or `--
 
 ```bash
 # generate with a multimodal model and image file(s)
-$ oll -m gemma3:12b \
+$ oll -m qwen3-vl:8b \
     -p "what is this picture?" \
     -f ~/Downloads/some_image.png
 ```
