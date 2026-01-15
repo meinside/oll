@@ -12,12 +12,15 @@ import (
 
 // config struct
 type config struct {
-	DefaultModel      *string `json:"default_model,omitempty"`
+	DefaultModel         *string `json:"default_model,omitempty"`
+	ImageGenerationModel *string `json:"image_generation_model,omitempty"`
+
 	SystemInstruction *string `json:"system_instruction,omitempty"`
 
 	OllamaAPIKey *string `json:"ollama_api_key,omitempty"`
 
-	TimeoutSeconds int `json:"timeout_seconds,omitempty"`
+	TimeoutSeconds                int `json:"timeout_seconds,omitempty"`
+	ImageGenerationTimeoutSeconds int `json:"image_generation_timeout_seconds,omitempty"`
 
 	ReplaceHTTPURLTimeoutSeconds int `json:"replace_http_url_timeout_seconds,omitempty"`
 }
@@ -37,6 +40,9 @@ func readConfig(
 				// set default values
 				if conf.TimeoutSeconds <= 0 {
 					conf.TimeoutSeconds = defaultTimeoutSeconds
+				}
+				if conf.ImageGenerationTimeoutSeconds <= 0 {
+					conf.ImageGenerationTimeoutSeconds = defaultImageGenerationTimeoutSeconds
 				}
 				if conf.ReplaceHTTPURLTimeoutSeconds <= 0 {
 					conf.ReplaceHTTPURLTimeoutSeconds = defaultFetchURLTimeoutSeconds

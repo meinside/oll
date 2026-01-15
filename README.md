@@ -8,6 +8,29 @@ If the given prompt includes URLs, it can also fetch the contents of the URLs an
 
 ## Build / Install
 
+Fetch the source code of Ollama,
+
+```bash
+$ git clone https://github.com/ollama/ollama.git
+```
+
+Set environment variables, (especially for MLX on macOS)
+
+```bash
+$ export CGO_CXXFLAGS="-I/path/to/ollama/llama/llama.cpp/vendor"
+$ export CGO_CFLAGS="-I/path/to/ollama/llama/llama.cpp/vendor"
+```
+
+and build:
+
+```bash
+$ git clone https://github.com/meinside/oll.git
+$ cd oll/
+$ go build
+```
+
+or install:
+
 ```bash
 $ go install github.com/meinside/oll@latest
 ```
@@ -82,6 +105,15 @@ You can generate with thinking with [models which support thinking](https://olla
 ```bash
 $ oll -m "qwen3:8b" -p "what is the earth escape velocity?" --with-thinking
 $ oll -m "qwen3:8b" -p "what are the three laws of newton?" --with-thinking --hide-reasoning
+```
+
+You can generate images with image generation models:
+
+```bash
+$ oll -m "x/z-image-turbo:latest" \
+    -p "generate an image of a cute chihuahua puppy" \
+    --with-images --save-images-to-dir=~/Downloads \
+    --image-width=512 --image-height=512
 ```
 
 ### JSON Output

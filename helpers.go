@@ -736,39 +736,17 @@ func ChunkText(
 	}, nil
 }
 
-// expandPath expands given path.
-func expandPath(path string) string {
-	// handle `~/*`,
-	if strings.HasPrefix(path, "~/") {
-		if homeDir, err := os.UserHomeDir(); err == nil {
-			path = strings.Replace(
-				path,
-				"~",
-				homeDir,
-				1,
-			)
-		}
-	}
-
-	// expand environment variables, eg. $HOME
-	path = os.ExpandEnv(path)
-
-	// clean,
-	path = filepath.Clean(path)
-
-	return path
-}
-
 // runExecutable runs executable with given args and return its result.
 func runExecutable(
 	execPath string,
-	args map[string]any,
+	args api.ToolCallFunctionArguments,
 ) (result string, err error) {
 	execPath = expandPath(execPath)
+	argsMap := args.ToMap()
 
 	// marshal args
 	var paramArgs []byte
-	paramArgs, err = json.Marshal(args)
+	paramArgs, err = json.Marshal(argsMap)
 	if err != nil {
 		return "", fmt.Errorf(
 			"failed to marshal args: %w",
@@ -777,15 +755,15 @@ func runExecutable(
 	}
 
 	// and run
-	arg := string(paramArgs)
-	cmd := exec.Command(execPath, arg)
+	cmdArgs := string(paramArgs)
+	cmd := exec.Command(execPath, cmdArgs)
 	var output []byte
 	output, err = cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf(
 			"failed to run '%s' with args %s: %w",
 			execPath,
-			arg,
+			cmdArgs,
 			err,
 		)
 	}
@@ -980,4 +958,48 @@ func webSearch(ollamaAPIKey string, query string) (results []SearchResultItem, e
 		return nil, fmt.Errorf("failed to unmarshal API response: %w", err)
 	}
 	return apiResponse.Results, nil
+}
+
+// generate image save directory (default: $TMPDIR)
+func imagesSaveDir(configuredDir *string) string {
+	if configuredDir != nil {
+		return expandPath(*configuredDir)
+	}
+
+	return os.TempDir()
+}
+
+// expand given path
+func expandPath(path string) string {
+	// handle `~/*`,
+	if strings.HasPrefix(path, "~/") {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			path = strings.Replace(
+				path,
+				"~",
+				homeDir,
+				1,
+			)
+		}
+	}
+
+	// handle `./*`,
+	if strings.HasPrefix(path, "./") {
+		if cwd, err := os.Getwd(); err == nil {
+			path = strings.Replace(
+				path,
+				"./",
+				cwd+"/",
+				1,
+			)
+		}
+	}
+
+	// expand environment variables, eg. $HOME
+	path = os.ExpandEnv(path)
+
+	// clean,
+	path = filepath.Clean(path)
+
+	return path
 }
