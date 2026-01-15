@@ -32,9 +32,10 @@ Respond to user messages according to the following principles:
 - When textual files are provided for context, they will be listed between the '` + filesTagBegin + filesTagEnd + `' tags in the prompt, so make sure to use them if provided.
 `
 
-	defaultTimeoutSeconds         = 5 * 60 // 5 minutes
-	defaultFetchURLTimeoutSeconds = 10     // 10 seconds
-	defaultUserAgent              = `oll/fetcher`
+	defaultTimeoutSeconds                = 5 * 60  // 5 minutes
+	defaultImageGenerationTimeoutSeconds = 10 * 60 // 10 minutes
+	defaultFetchURLTimeoutSeconds        = 10      // 10 seconds
+	defaultUserAgent                     = `oll/fetcher`
 )
 
 // run the application with params.
@@ -76,10 +77,16 @@ func run(
 	if conf.DefaultModel != nil && p.Model == nil {
 		p.Model = conf.DefaultModel
 	}
+	if conf.ImageGenerationModel != nil && p.ModelForImageGeneration == nil {
+		p.ModelForImageGeneration = conf.ImageGenerationModel
+	}
 
 	// set default values
 	if p.Model == nil {
 		p.Model = ptr(defaultModel)
+	}
+	if p.ModelForImageGeneration == nil {
+		p.ModelForImageGeneration = ptr(defaultModelForImageGeneration)
 	}
 	if p.Generation.SystemInstruction == nil {
 		p.Generation.SystemInstruction = ptr(defaultSystemInstruction(p))
@@ -242,34 +249,49 @@ func run(
 				}
 			}()
 
-			return doGeneration(
-				context.TODO(),
-				output,
-				conf,
-				*p.Model,
-				*p.Generation.SystemInstruction,
-				p.Generation.Temperature,
-				p.Generation.TopP,
-				p.Generation.TopK,
-				p.Generation.Stop,
-				p.Generation.OutputJSONScheme,
-				p.Generation.WithThinking,
-				p.Generation.HideReasoning,
-				p.ContextWindowSize,
-				*p.Generation.Prompt,
-				p.Generation.Filepaths,
-				p.Tools.ShowCallbackResults,
-				p.Tools.RecurseOnCallbackResults,
-				p.Tools.ForceCallDestructiveTools,
-				localTools,
-				p.LocalTools.ToolCallbacks,
-				p.LocalTools.ToolCallbacksConfirm,
-				allMCPTools,
-				nil,
-				p.UserAgent,
-				p.ReplaceHTTPURLsInPrompt,
-				p.Verbose,
-			)
+			if !p.Generation.WithImages {
+				return doGeneration(
+					context.TODO(),
+					output,
+					conf,
+					*p.Model,
+					*p.Generation.SystemInstruction,
+					p.Generation.Temperature,
+					p.Generation.TopP,
+					p.Generation.TopK,
+					p.Generation.Stop,
+					p.Generation.OutputJSONScheme,
+					p.Generation.WithThinking,
+					p.Generation.HideReasoning,
+					p.ContextWindowSize,
+					*p.Generation.Prompt,
+					p.Generation.Filepaths,
+					p.Tools.ShowCallbackResults,
+					p.Tools.RecurseOnCallbackResults,
+					p.Tools.ForceCallDestructiveTools,
+					localTools,
+					p.LocalTools.ToolCallbacks,
+					p.LocalTools.ToolCallbacksConfirm,
+					allMCPTools,
+					nil,
+					p.UserAgent,
+					p.ReplaceHTTPURLsInPrompt,
+					p.Verbose,
+				)
+			} else {
+				return doImageGeneration(
+					context.TODO(),
+					output,
+					conf,
+					*p.ModelForImageGeneration,
+					*p.Generation.Prompt,
+					p.Generation.NegativePrompt,
+					p.Generation.ImageWidth,
+					p.Generation.ImageHeight,
+					p.Generation.SaveImagesToDir,
+					p.Verbose,
+				)
+			}
 		}
 	} else if p.ListModels {
 		return doListModels(

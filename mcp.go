@@ -124,13 +124,14 @@ func mcpToOllamaTools(
 func fetchToolCallResult(
 	ctx context.Context,
 	mc *mcp.ClientSession,
-	fnName string, fnArgs map[string]any,
+	fnName string,
+	fnArgs api.ToolCallFunctionArguments,
 ) (res *mcp.CallToolResult, err error) {
 	if res, err = mc.CallTool(
 		ctx,
 		&mcp.CallToolParams{
 			Name:      fnName,
-			Arguments: fnArgs,
+			Arguments: fnArgs.ToMap(),
 		},
 	); err == nil {
 		return res, nil

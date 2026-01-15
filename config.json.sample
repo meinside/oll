@@ -4,6 +4,7 @@
 
   // settings for model
   //"default_model": "mistral-small3.2:24b",
+  //"image_generation_model": "x/z-image-turbo:latest",
   //"system_instruction": "You are a chat bot which responds to user requests reliably and accurately.",
 
   // network timeout seconds (for fetching urls, and/or generating responses)

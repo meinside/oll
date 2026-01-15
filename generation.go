@@ -7,9 +7,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"text/template"
@@ -18,11 +20,16 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/ollama/ollama/api"
+	"github.com/ollama/ollama/progress"
+	"github.com/ollama/ollama/x/imagegen"
 )
 
 const (
 	// https://ollama.com/library/mistral-small3.2
-	defaultModel = "mistral-small3.2:24b" // NOTE: picked a model which supports both tooling and vision for convenience
+	defaultModel = `mistral-small3.2:24b` // NOTE: picked a model which supports both tooling and vision for convenience
+
+	// https://ollama.com/x/z-image-turbo
+	defaultModelForImageGeneration = `x/z-image-turbo`
 )
 
 // generation parameter constants
@@ -33,6 +40,11 @@ const (
 
 	defaultEmbeddingsChunkSize           uint = 2048 * 2
 	defaultEmbeddingsChunkOverlappedSize uint = 64
+
+	defaultImageGenerationSteps  int = 9
+	randomImageGenerationSeed    int = 0
+	defaultImageGenerationWidth  int = 1024
+	defaultImageGenerationHeight int = 1024
 )
 
 // newOllamaClient returns a newly created ollama api client.
@@ -123,7 +135,7 @@ func doGeneration(
 		images = append(images, api.ImageData(img))
 	}
 
-	// TODO: return error when the context length is exceeded
+	// FIXME: TODO: return error when the context length is exceeded
 
 	output.verbose(
 		verboseMaximum,
@@ -515,8 +527,8 @@ func doGeneration(
 						)
 
 						// TODO: handle images
+						// FIXME: print or save generated content
 						handled := fmt.Sprintf("Generated %d images.", len(resp.Message.Images))
-						// FIXME: print generated content
 						output.printColored(
 							color.FgHiWhite,
 							"%s\n",
@@ -612,6 +624,130 @@ func doGeneration(
 
 		return res.exit, res.err
 	}
+}
+
+// doImageGeneration generates images.
+func doImageGeneration(
+	ctx context.Context,
+	output *outputWriter,
+	conf config,
+	model string,
+	prompt string,
+	negativePrompt *string, // (optional)
+	width, height *int,
+	configuredImagesDir *string,
+	vbs []bool,
+) (exit int, e error) {
+	output.verbose(
+		verboseMedium,
+		vbs,
+		"generating images...",
+	)
+
+	ctx, cancel := context.WithTimeout(
+		ctx,
+		time.Duration(conf.ImageGenerationTimeoutSeconds)*time.Second,
+	)
+	defer cancel()
+
+	// ollama api client
+	client, err := newOllamaClient()
+	if err != nil {
+		return 1, fmt.Errorf("failed to initialize Ollama API client: %w", err)
+	}
+
+	// default values
+	if width == nil {
+		width = ptr(defaultImageGenerationWidth)
+	}
+	if height == nil {
+		height = ptr(defaultImageGenerationHeight)
+	}
+
+	opts := imagegen.ImageGenOptions{
+		Width:  *width,
+		Height: *height,
+		Steps:  defaultImageGenerationSteps,
+		Seed:   randomImageGenerationSeed,
+	}
+	if negativePrompt != nil {
+		opts.NegativePrompt = *negativePrompt
+	}
+
+	// Build request with image gen options encoded in Options fields
+	// NumCtx=width, NumGPU=height, NumPredict=steps, Seed=seed
+	req := &api.GenerateRequest{
+		Model:  model,
+		Prompt: prompt,
+		Options: map[string]any{
+			"num_ctx":     opts.Width,
+			"num_gpu":     opts.Height,
+			"num_predict": opts.Steps,
+			"seed":        opts.Seed,
+		},
+		KeepAlive: &api.Duration{
+			Duration: time.Duration(conf.ImageGenerationTimeoutSeconds) * time.Second,
+		},
+	}
+
+	// Show loading spinner until generation starts
+	pg := progress.NewProgress(os.Stderr)
+	spinner := progress.NewSpinner("")
+	pg.Add("", spinner)
+
+	var stepBar *progress.StepBar
+	var imageBase64 string
+	err = client.Generate(ctx, req, func(resp api.GenerateResponse) error {
+		content := resp.Response
+
+		// Handle progress updates - parse step info and switch to step bar
+		if strings.HasPrefix(content, "\rGenerating:") {
+			var step, total int
+			fmt.Sscanf(content, "\rGenerating: step %d/%d", &step, &total)
+			if stepBar == nil && total > 0 {
+				spinner.Stop()
+				stepBar = progress.NewStepBar("Generating", total)
+				pg.Add("", stepBar)
+			}
+			if stepBar != nil {
+				stepBar.Set(step)
+			}
+			return nil
+		}
+
+		// Handle final response with base64 image data
+		if resp.Done && strings.HasPrefix(content, "IMAGE_BASE64:") {
+			imageBase64 = content[13:]
+		}
+
+		return nil
+	})
+
+	pg.Stop()
+	if err != nil {
+		return 1, err
+	}
+
+	if imageBase64 != "" {
+		// Decode base64 and save to CWD
+		imageData, err := base64.StdEncoding.DecodeString(imageBase64)
+		if err != nil {
+			return 1, fmt.Errorf("failed to decode image: %w", err)
+		}
+
+		// Create filename from timestamp
+		timestamp := time.Now().Format("20060102_150405")
+		filename := fmt.Sprintf("oll_%s.png", timestamp)
+		filepath := filepath.Join(imagesSaveDir(configuredImagesDir), filename)
+
+		if err := os.WriteFile(filepath, imageData, 0o644); err != nil {
+			return 1, fmt.Errorf("failed to save image: %w", err)
+		}
+
+		output.printColored(color.FgGreen, "Image saved to: %s\n", filepath)
+	}
+
+	return 0, nil
 }
 
 // doListModels lists available models.
@@ -855,7 +991,9 @@ func checkCallbackPath(
 			}
 
 			if len(ollamaAPIKey) > 0 {
-				if query, exists := fnCall.Arguments[searchParamQuery]; exists {
+				args := fnCall.Arguments.ToMap()
+
+				if query, exists := args[searchParamQuery]; exists {
 					if query, ok := query.(string); ok {
 						if searched, err := webSearch(ollamaAPIKey, query); err == nil {
 							return prettify(searched, false), nil

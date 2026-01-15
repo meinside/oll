@@ -13,7 +13,8 @@ type params struct {
 	ConfigFilepath *string `short:"c" long:"config" description:"Config file's path (default: $XDG_CONFIG_HOME/oll/config.json)"`
 
 	// for ollama model
-	Model *string `short:"m" long:"model" description:"Model to use (can be omitted)"`
+	Model                   *string `short:"m" long:"model" description:"Model to use (can be omitted)"`
+	ModelForImageGeneration *string `long:"image-generation-model" description:"Model for image generation (can be omitted)"`
 
 	// parameters for generation
 	//
@@ -34,6 +35,13 @@ type params struct {
 		// thinking
 		WithThinking  bool `short:"k" long:"with-thinking" description:"Generate with thinking (works only with models which support thinking)"`
 		HideReasoning bool `short:"H" long:"hide-reasoning" description:"Hide reasoning (<think></think>) while streaming the result"`
+
+		// image generation
+		NegativePrompt  *string `long:"negative-prompt" description:"Negative prompt for image generation"`
+		ImageWidth      *int    `long:"image-width" description:"Width for image generation"`
+		ImageHeight     *int    `long:"image-height" description:"Height for image generation"`
+		WithImages      bool    `long:"with-images" description:"Generate images with this prompt (works only with models which support image generation)"`
+		SaveImagesToDir *string `long:"save-images-to-dir" description:"Save generated images to this directory (default: $TMPDIR)"`
 	} `group:"Generation"`
 
 	// tools
