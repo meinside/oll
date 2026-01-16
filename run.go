@@ -289,6 +289,7 @@ func run(
 					p.Generation.ImageWidth,
 					p.Generation.ImageHeight,
 					p.Generation.SaveImagesToDir,
+					p.Generation.DisplayImageInTerminal,
 					p.Verbose,
 				)
 			}

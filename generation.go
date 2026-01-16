@@ -19,6 +19,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/progress"
 	"github.com/ollama/ollama/x/imagegen"
@@ -26,7 +27,7 @@ import (
 
 const (
 	// https://ollama.com/library/mistral-small3.2
-	defaultModel = `mistral-small3.2:24b` // NOTE: picked a model which supports both tooling and vision for convenience
+	defaultModel = `mistral-small3.2:24b` // NOTE: picked a model which supports both tooling and vision (just for convenience)
 
 	// https://ollama.com/x/z-image-turbo
 	defaultModelForImageGeneration = `x/z-image-turbo`
@@ -627,6 +628,8 @@ func doGeneration(
 }
 
 // doImageGeneration generates images.
+//
+// * referenced: https://github.com/ollama/ollama/blob/main/x/imagegen/cli.go
 func doImageGeneration(
 	ctx context.Context,
 	output *outputWriter,
@@ -636,6 +639,7 @@ func doImageGeneration(
 	negativePrompt *string, // (optional)
 	width, height *int,
 	configuredImagesDir *string,
+	displayInTerminal bool,
 	vbs []bool,
 ) (exit int, e error) {
 	output.verbose(
@@ -671,7 +675,7 @@ func doImageGeneration(
 		Seed:   randomImageGenerationSeed,
 	}
 	if negativePrompt != nil {
-		opts.NegativePrompt = *negativePrompt
+		opts.NegativePrompt = *negativePrompt // FIXME: negative prompt is not used yet
 	}
 
 	// Build request with image gen options encoded in Options fields
@@ -703,7 +707,7 @@ func doImageGeneration(
 		// Handle progress updates - parse step info and switch to step bar
 		if strings.HasPrefix(content, "\rGenerating:") {
 			var step, total int
-			fmt.Sscanf(content, "\rGenerating: step %d/%d", &step, &total)
+			_, _ = fmt.Sscanf(content, "\rGenerating: step %d/%d", &step, &total)
 			if stepBar == nil && total > 0 {
 				spinner.Stop()
 				stepBar = progress.NewStepBar("Generating", total)
@@ -729,17 +733,27 @@ func doImageGeneration(
 	}
 
 	if imageBase64 != "" {
-		// Decode base64 and save to CWD
+		// Decode base64 data,
 		imageData, err := base64.StdEncoding.DecodeString(imageBase64)
 		if err != nil {
 			return 1, fmt.Errorf("failed to decode image: %w", err)
 		}
 
-		// Create filename from timestamp
+		// display in terminal,
+		if displayInTerminal {
+			if err := displayImageInTerminal(imageData, mimetype.Detect(imageData).String()); err != nil {
+				output.printColored(color.FgRed, "Failed to display image in terminal: %s\n", err.Error())
+			} else {
+				output.println()
+			}
+		}
+
+		// create filename from timestamp
 		timestamp := time.Now().Format("20060102_150405")
 		filename := fmt.Sprintf("oll_%s.png", timestamp)
 		filepath := filepath.Join(imagesSaveDir(configuredImagesDir), filename)
 
+		// save to a file,
 		if err := os.WriteFile(filepath, imageData, 0o644); err != nil {
 			return 1, fmt.Errorf("failed to save image: %w", err)
 		}
