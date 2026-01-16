@@ -3,6 +3,7 @@ module github.com/meinside/oll
 go 1.24.4
 
 require (
+	github.com/BourgeoisBear/rasterm v1.1.2
 	github.com/PuerkitoBio/goquery v1.11.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.18.0

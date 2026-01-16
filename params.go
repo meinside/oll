@@ -33,15 +33,16 @@ type params struct {
 		OutputJSONScheme *string `short:"j" long:"json" description:"Output result as this JSON scheme"`
 
 		// thinking
-		WithThinking  bool `short:"k" long:"with-thinking" description:"Generate with thinking (works only with models which support thinking)"`
+		WithThinking  bool `short:"T" long:"with-thinking" description:"Generate with thinking (works only with models which support thinking)"`
 		HideReasoning bool `short:"H" long:"hide-reasoning" description:"Hide reasoning (<think></think>) while streaming the result"`
 
 		// image generation
-		NegativePrompt  *string `long:"negative-prompt" description:"Negative prompt for image generation"`
-		ImageWidth      *int    `long:"image-width" description:"Width for image generation"`
-		ImageHeight     *int    `long:"image-height" description:"Height for image generation"`
-		WithImages      bool    `long:"with-images" description:"Generate images with this prompt (works only with models which support image generation)"`
-		SaveImagesToDir *string `long:"save-images-to-dir" description:"Save generated images to this directory (default: $TMPDIR)"`
+		WithImages             bool    `short:"I" long:"with-images" description:"Generate images with this prompt (works only with models which support image generation)"`
+		NegativePrompt         *string `long:"negative-prompt" description:"Negative prompt for image generation"`
+		ImageWidth             *int    `long:"image-width" description:"Width for image generation"`
+		ImageHeight            *int    `long:"image-height" description:"Height for image generation"`
+		SaveImagesToDir        *string `long:"save-images-to-dir" description:"Save generated images to this directory (default: $TMPDIR)"`
+		DisplayImageInTerminal bool    `long:"display-image-in-terminal" description:"Display generated images in terminal"`
 	} `group:"Generation"`
 
 	// tools
