@@ -13,7 +13,7 @@ require (
 	github.com/jwalton/go-supportscolor v1.2.0
 	github.com/meinside/version-go v0.0.3
 	github.com/modelcontextprotocol/go-sdk v1.2.0
-	github.com/ollama/ollama v0.14.1
+	github.com/ollama/ollama v0.14.2
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	mvdan.cc/sh v2.6.4+incompatible
 )
@@ -23,7 +23,7 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
-	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
+	github.com/clipperhouse/uax29/v2 v2.3.1 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/emirpasic/gods/v2 v2.0.0-alpha // indirect
 	github.com/google/uuid v1.6.0 // indirect
