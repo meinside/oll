@@ -286,6 +286,7 @@ func run(
 					*p.ModelForImageGeneration,
 					*p.Generation.Prompt,
 					p.Generation.NegativePrompt,
+					p.Generation.Filepaths,
 					p.Generation.ImageWidth,
 					p.Generation.ImageHeight,
 					p.Generation.SaveImagesToDir,
