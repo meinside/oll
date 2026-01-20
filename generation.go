@@ -636,7 +636,8 @@ func doImageGeneration(
 	conf config,
 	model string,
 	prompt string,
-	negativePrompt *string, // (optional)
+	negativePrompt *string,
+	filepaths []*string,
 	width, height *int,
 	configuredImagesDir *string,
 	displayInTerminal bool,
@@ -678,11 +679,26 @@ func doImageGeneration(
 		opts.NegativePrompt = *negativePrompt // FIXME: negative prompt is not used yet
 	}
 
+	// convert prompt with/without files
+	prompt, imageFiles, err := convertPromptAndFiles(
+		prompt,
+		nil,
+		filepaths,
+	)
+	if err != nil {
+		return 1, fmt.Errorf("failed to convert prompt and files: %w", err)
+	}
+	var images []api.ImageData = nil
+	if len(imageFiles) > 0 {
+		images = append(images, imageFiles...)
+	}
+
 	// Build request with image gen options encoded in Options fields
 	// NumCtx=width, NumGPU=height, NumPredict=steps, Seed=seed
 	req := &api.GenerateRequest{
 		Model:  model,
 		Prompt: prompt,
+		Images: images, // FIXME: not working yet?
 		Options: map[string]any{
 			"num_ctx":     opts.Width,
 			"num_gpu":     opts.Height,
