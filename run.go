@@ -73,20 +73,24 @@ func run(
 		return 1, fmt.Errorf("failed to read configuration: %w", err)
 	}
 
-	// override parameters with command arguments
-	if conf.DefaultModel != nil && p.Model == nil {
-		p.Model = conf.DefaultModel
-	}
-	if conf.ImageGenerationModel != nil && p.ModelForImageGeneration == nil {
-		p.ModelForImageGeneration = conf.ImageGenerationModel
+	// override parameters with config if parameters are not given
+	if !p.Generation.WithImages {
+		if conf.DefaultModel != nil && p.Model == nil {
+			p.Model = conf.DefaultModel
+		}
+	} else {
+		if conf.ImageGenerationModel != nil && p.Model == nil {
+			p.Model = conf.ImageGenerationModel
+		}
 	}
 
-	// set default values
+	// set default values if parameters are still missing
 	if p.Model == nil {
-		p.Model = ptr(defaultModel)
-	}
-	if p.ModelForImageGeneration == nil {
-		p.ModelForImageGeneration = ptr(defaultModelForImageGeneration)
+		if !p.Generation.WithImages {
+			p.Model = ptr(defaultModel)
+		} else {
+			p.Model = ptr(defaultModelForImageGeneration)
+		}
 	}
 	if p.Generation.SystemInstruction == nil {
 		p.Generation.SystemInstruction = ptr(defaultSystemInstruction(p))
@@ -283,7 +287,7 @@ func run(
 					context.TODO(),
 					output,
 					conf,
-					*p.ModelForImageGeneration,
+					*p.Model,
 					*p.Generation.Prompt,
 					p.Generation.NegativePrompt,
 					p.Generation.Filepaths,
