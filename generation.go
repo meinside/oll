@@ -694,20 +694,21 @@ func doImageGeneration(
 	}
 
 	// Build request with image gen options encoded in Options fields
-	// NumCtx=width, NumGPU=height, NumPredict=steps, Seed=seed
 	req := &api.GenerateRequest{
 		Model:  model,
 		Prompt: prompt,
 		Images: images, // FIXME: not working yet?
-		Options: map[string]any{
-			"num_ctx":     opts.Width,
-			"num_gpu":     opts.Height,
-			"num_predict": opts.Steps,
-			"seed":        opts.Seed,
-		},
 		KeepAlive: &api.Duration{
 			Duration: time.Duration(conf.ImageGenerationTimeoutSeconds) * time.Second,
 		},
+		Width:  int32(opts.Width),  // FIXME: not working yet?
+		Height: int32(opts.Height), // FIXME: not working yet?
+		Steps:  int32(opts.Steps),
+	}
+	if opts.Seed != 0 {
+		req.Options = map[string]any{
+			"seed": opts.Seed,
+		}
 	}
 
 	// Show loading spinner until generation starts
@@ -718,12 +719,17 @@ func doImageGeneration(
 	var stepBar *progress.StepBar
 	var imageBase64 string
 	err = client.Generate(ctx, req, func(resp api.GenerateResponse) error {
-		content := resp.Response
-
-		// Handle progress updates - parse step info and switch to step bar
-		if strings.HasPrefix(content, "\rGenerating:") {
+		// Handle progress updates using structured fields
+		if resp.Total > 0 {
+			if stepBar == nil {
+				spinner.Stop()
+				stepBar = progress.NewStepBar("Generating", int(resp.Total))
+				pg.Add("", stepBar)
+			}
+			stepBar.Set(int(resp.Completed))
+		} else if strings.HasPrefix(resp.Response, "\rGenerating:") { // NOTE: for backward compatibility
 			var step, total int
-			_, _ = fmt.Sscanf(content, "\rGenerating: step %d/%d", &step, &total)
+			_, _ = fmt.Sscanf(resp.Response, "\rGenerating: step %d/%d", &step, &total)
 			if stepBar == nil && total > 0 {
 				spinner.Stop()
 				stepBar = progress.NewStepBar("Generating", total)
@@ -735,15 +741,22 @@ func doImageGeneration(
 			return nil
 		}
 
-		// Handle final response with base64 image data
-		if resp.Done && strings.HasPrefix(content, "IMAGE_BASE64:") {
-			imageBase64 = content[13:]
+		// Handle final response with image data
+		if resp.Done {
+			if resp.Image != "" {
+				imageBase64 = resp.Image
+			} else if strings.HasPrefix(resp.Response, "IMAGE_BASE64:") { // NOTE: for backward compatibility
+				imageBase64 = resp.Response[13:]
+			}
+
+			// FIXME: print generated image's seed value
+			// output.printColored(color.FgGreen, "Seed of generated image: %s\n", resp.Seed)
 		}
 
 		return nil
 	})
 
-	pg.Stop()
+	pg.StopAndClear()
 	if err != nil {
 		return 1, err
 	}
@@ -775,6 +788,8 @@ func doImageGeneration(
 		}
 
 		output.printColored(color.FgGreen, "Image saved to: %s\n", filepath)
+	} else {
+		output.printColored(color.FgRed, "Failed to generate image; no image data received.\n")
 	}
 
 	return 0, nil

@@ -13,8 +13,7 @@ type params struct {
 	ConfigFilepath *string `short:"c" long:"config" description:"Config file's path (default: $XDG_CONFIG_HOME/oll/config.json)"`
 
 	// for ollama model
-	Model                   *string `short:"m" long:"model" description:"Model to use (can be omitted)"`
-	ModelForImageGeneration *string `long:"image-generation-model" description:"Model for image generation (can be omitted)"`
+	Model *string `short:"m" long:"model" description:"Model to use (can be omitted)"`
 
 	// parameters for generation
 	//
