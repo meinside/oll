@@ -8,28 +8,29 @@ If the given prompt includes URLs, it can also fetch the contents of the URLs an
 
 ## Build / Install
 
-Fetch the source code of Ollama,
+Build `ollama` with mlx tag (for image generation on macOS) and run it:
 
 ```bash
 $ git clone https://github.com/ollama/ollama.git
+$ cd ollama/
+$ cmake --preset MLX
+$ cmake --build --preset MLX --parallel
+$ cmake --install build --component MLX
+$ go build -tags mlx .
+$ ./ollama serve
 ```
 
-Set environment variables, (especially for MLX on macOS)
-
-```bash
-$ export CGO_CXXFLAGS="-I/path/to/ollama/llama/llama.cpp/vendor"
-$ export CGO_CFLAGS="-I/path/to/ollama/llama/llama.cpp/vendor"
-```
-
-and build:
+and then build `oll`:
 
 ```bash
 $ git clone https://github.com/meinside/oll.git
 $ cd oll/
+$ export CGO_CFLAGS="-I/path/to/ollama/llama/llama.cpp/vendor"
+$ export CGO_CXXFLAGS="-I/path/to/ollama/llama/llama.cpp/vendor"
 $ go build
 ```
 
-or install:
+or install with:
 
 ```bash
 $ go install github.com/meinside/oll@latest
@@ -49,6 +50,7 @@ with following content:
 ```json
 {
   "default_model": "mistral-small3.2:24b",
+  "image_generation_model": "x/flux2-klein:latest",
 
   "timeout_seconds": 300,
   "replace_http_url_timeout_seconds": 10
@@ -112,8 +114,18 @@ You can generate images with image generation models:
 ```bash
 $ oll -m "x/z-image-turbo:latest" \
     -p "generate an image of a cute chihuahua puppy" \
-    --with-images --save-images-to-dir=~/Downloads \
-    --image-width=512 --image-height=512
+    --with-images \
+    --save-images-to-dir=~/Downloads
+```
+
+or edit an image file with models which support image edit:
+
+```bash
+$ oll -m "x/flux2-klein:latest" \
+    -p "change the dog in the image to a cat" \
+    -f "~/files/chihuahua.jpg" \
+    --with-images \
+    --save-images-to-dir=~/Downloads
 ```
 
 ### JSON Output
