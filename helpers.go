@@ -188,6 +188,9 @@ func expandFilepaths(
 			continue
 		}
 
+		// expand given filepath
+		fp = ptr(expandPath(*fp))
+
 		if stat, err := os.Stat(*fp); err == nil {
 			if stat.IsDir() {
 				if files, err := filesInDir(output, *fp, p.Verbose); err == nil {

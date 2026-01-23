@@ -697,12 +697,12 @@ func doImageGeneration(
 	req := &api.GenerateRequest{
 		Model:  model,
 		Prompt: prompt,
-		Images: images, // FIXME: not working yet?
+		Images: images,
 		KeepAlive: &api.Duration{
 			Duration: time.Duration(conf.ImageGenerationTimeoutSeconds) * time.Second,
 		},
-		Width:  int32(opts.Width),  // FIXME: not working yet?
-		Height: int32(opts.Height), // FIXME: not working yet?
+		Width:  int32(opts.Width),
+		Height: int32(opts.Height),
 		Steps:  int32(opts.Steps),
 	}
 	if opts.Seed != 0 {
