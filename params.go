@@ -20,28 +20,36 @@ type params struct {
 	// https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
 	Generation struct {
 		// prompt, system instruction, and other things for generation
-		Prompt            *string   `short:"p" long:"prompt" description:"Prompt for generation (can also be read from stdin)"`
-		Filepaths         []*string `short:"f" long:"filepath" description:"Path of a file or directory (can be used multiple times)"`
-		SystemInstruction *string   `short:"s" long:"system" description:"System instruction (can be omitted)"`
-		Temperature       *float32  `long:"temperature" description:"'temperature' for generation (default: 1.0)"`
-		TopP              *float32  `long:"top-p" description:"'top_p' for generation (default: 0.95)"`
-		TopK              *int32    `long:"top-k" description:"'top_k' for generation (default: 20)"`
-		Stop              []*string `long:"stop" description:"'stop' sequence string for generation (can be used multiple times)"`
+		Prompt    *string   `short:"p" long:"prompt" description:"Prompt for generation (can also be read from stdin)"`
+		Filepaths []*string `short:"f" long:"filepath" description:"Path of a file or directory (can be used multiple times)"`
+
+		DetailedOptions struct {
+			SystemInstruction *string   `short:"s" long:"system" description:"System instruction (can be omitted)"`
+			Temperature       *float32  `long:"temperature" description:"'temperature' for generation (default: 1.0)"`
+			TopP              *float32  `long:"top-p" description:"'top_p' for generation (default: 0.95)"`
+			TopK              *int32    `long:"top-k" description:"'top_k' for generation (default: 20)"`
+			Stop              []*string `long:"stop" description:"'stop' sequence string for generation (can be used multiple times)"`
+		} `group:"Detailed Generation Options"`
+
+		// thinking
+		Thinking struct {
+			WithThinking  bool `short:"T" long:"with-thinking" description:"Generate with thinking (works only with models which support thinking)"`
+			HideReasoning bool `short:"H" long:"hide-reasoning" description:"Hide reasoning (<think></think>) while streaming the result"`
+		} `group:"Thinking Options"`
+
+		// image generation
+		Image struct {
+			WithImages              bool    `short:"I" long:"with-images" description:"Generate images with this prompt (works only with models which support image generation)"`
+			NegativePrompt          *string `long:"negative-prompt" description:"Negative prompt for image generation"`
+			Width                   *int    `long:"image-width" description:"Width for image generation"`
+			Height                  *int    `long:"image-height" description:"Height for image generation"`
+			Seed                    *int    `long:"image-seed" description:"Seed for image generation (default: random number)"`
+			SaveImagesToDir         *string `long:"save-images-to-dir" description:"Save generated images to this directory (default: $TMPDIR)"`
+			DisplayImagesInTerminal bool    `long:"display-images-in-terminal" description:"Display generated images in terminal"`
+		} `group:"Image Generation Options"`
 
 		// other generation options
 		OutputJSONScheme *string `short:"j" long:"json" description:"Output result as this JSON scheme"`
-
-		// thinking
-		WithThinking  bool `short:"T" long:"with-thinking" description:"Generate with thinking (works only with models which support thinking)"`
-		HideReasoning bool `short:"H" long:"hide-reasoning" description:"Hide reasoning (<think></think>) while streaming the result"`
-
-		// image generation
-		WithImages             bool    `short:"I" long:"with-images" description:"Generate images with this prompt (works only with models which support image generation)"`
-		NegativePrompt         *string `long:"negative-prompt" description:"Negative prompt for image generation"`
-		ImageWidth             *int    `long:"image-width" description:"Width for image generation"`
-		ImageHeight            *int    `long:"image-height" description:"Height for image generation"`
-		SaveImagesToDir        *string `long:"save-images-to-dir" description:"Save generated images to this directory (default: $TMPDIR)"`
-		DisplayImageInTerminal bool    `long:"display-image-in-terminal" description:"Display generated images in terminal"`
 	} `group:"Generation"`
 
 	// tools

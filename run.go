@@ -66,15 +66,15 @@ func run(
 	// read and apply configs
 	var conf config
 	if conf, err = readConfig(resolveConfigFilepath(p.ConfigFilepath)); err == nil {
-		if p.Generation.SystemInstruction == nil && conf.SystemInstruction != nil {
-			p.Generation.SystemInstruction = conf.SystemInstruction
+		if p.Generation.DetailedOptions.SystemInstruction == nil && conf.SystemInstruction != nil {
+			p.Generation.DetailedOptions.SystemInstruction = conf.SystemInstruction
 		}
 	} else {
 		return 1, fmt.Errorf("failed to read configuration: %w", err)
 	}
 
 	// override parameters with config if parameters are not given
-	if !p.Generation.WithImages {
+	if !p.Generation.Image.WithImages {
 		if conf.DefaultModel != nil && p.Model == nil {
 			p.Model = conf.DefaultModel
 		}
@@ -86,14 +86,14 @@ func run(
 
 	// set default values if parameters are still missing
 	if p.Model == nil {
-		if !p.Generation.WithImages {
+		if !p.Generation.Image.WithImages {
 			p.Model = ptr(defaultModel)
 		} else {
 			p.Model = ptr(defaultModelForImageGeneration)
 		}
 	}
-	if p.Generation.SystemInstruction == nil {
-		p.Generation.SystemInstruction = ptr(defaultSystemInstruction(p))
+	if p.Generation.DetailedOptions.SystemInstruction == nil {
+		p.Generation.DetailedOptions.SystemInstruction = ptr(defaultSystemInstruction(p))
 	}
 	if p.UserAgent == nil {
 		p.UserAgent = ptr(defaultUserAgent)
@@ -253,20 +253,20 @@ func run(
 				}
 			}()
 
-			if !p.Generation.WithImages {
+			if !p.Generation.Image.WithImages {
 				return doGeneration(
 					context.TODO(),
 					output,
 					conf,
 					*p.Model,
-					*p.Generation.SystemInstruction,
-					p.Generation.Temperature,
-					p.Generation.TopP,
-					p.Generation.TopK,
-					p.Generation.Stop,
+					*p.Generation.DetailedOptions.SystemInstruction,
+					p.Generation.DetailedOptions.Temperature,
+					p.Generation.DetailedOptions.TopP,
+					p.Generation.DetailedOptions.TopK,
+					p.Generation.DetailedOptions.Stop,
 					p.Generation.OutputJSONScheme,
-					p.Generation.WithThinking,
-					p.Generation.HideReasoning,
+					p.Generation.Thinking.WithThinking,
+					p.Generation.Thinking.HideReasoning,
 					p.ContextWindowSize,
 					*p.Generation.Prompt,
 					p.Generation.Filepaths,
@@ -288,13 +288,10 @@ func run(
 					output,
 					conf,
 					*p.Model,
-					*p.Generation.Prompt,
-					p.Generation.NegativePrompt,
-					p.Generation.Filepaths,
-					p.Generation.ImageWidth,
-					p.Generation.ImageHeight,
-					p.Generation.SaveImagesToDir,
-					p.Generation.DisplayImageInTerminal,
+					*p.Generation.Prompt, p.Generation.Image.NegativePrompt, p.Generation.Filepaths,
+					p.Generation.Image.Width, p.Generation.Image.Height,
+					p.Generation.Image.Seed,
+					p.Generation.Image.SaveImagesToDir, p.Generation.Image.DisplayImagesInTerminal,
 					p.Verbose,
 				)
 			}
