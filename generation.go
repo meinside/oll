@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -26,11 +27,11 @@ import (
 )
 
 const (
-	// https://ollama.com/library/mistral-small3.2
-	defaultModel = `mistral-small3.2:24b` // NOTE: picked a model which supports both tooling and vision (just for convenience)
+	// https://ollama.com/library/qwen3-vl
+	defaultModel = `qwen3-vl:8b` // NOTE: picked a model which supports vision, tooling, and thinking (just for convenience)
 
-	// https://ollama.com/x/z-image-turbo
-	defaultModelForImageGeneration = `x/z-image-turbo`
+	// https://ollama.com/x/flux2-klein
+	defaultModelForImageGeneration = `x/flux2-klein:4b` // NOTE: picked an image generation model which support editing
 )
 
 // generation parameter constants
@@ -43,7 +44,6 @@ const (
 	defaultEmbeddingsChunkOverlappedSize uint = 64
 
 	defaultImageGenerationSteps  int = 9
-	randomImageGenerationSeed    int = 0
 	defaultImageGenerationWidth  int = 1024
 	defaultImageGenerationHeight int = 1024
 )
@@ -635,12 +635,10 @@ func doImageGeneration(
 	output *outputWriter,
 	conf config,
 	model string,
-	prompt string,
-	negativePrompt *string,
-	filepaths []*string,
+	prompt string, negativePrompt *string, filepaths []*string,
 	width, height *int,
-	configuredImagesDir *string,
-	displayInTerminal bool,
+	seed *int,
+	configuredImagesDir *string, displayInTerminal bool,
 	vbs []bool,
 ) (exit int, e error) {
 	output.verbose(
@@ -669,11 +667,19 @@ func doImageGeneration(
 		height = ptr(defaultImageGenerationHeight)
 	}
 
+	// seed for generation
+	var seedNum int
+	if seed != nil {
+		seedNum = *seed
+	} else {
+		seedNum = rand.Int()
+	}
+
 	opts := imagegen.ImageGenOptions{
 		Width:  *width,
 		Height: *height,
 		Steps:  defaultImageGenerationSteps,
-		Seed:   randomImageGenerationSeed,
+		Seed:   seedNum,
 	}
 	if negativePrompt != nil {
 		opts.NegativePrompt = *negativePrompt // FIXME: negative prompt is not used yet
@@ -704,11 +710,11 @@ func doImageGeneration(
 		Width:  int32(opts.Width),
 		Height: int32(opts.Height),
 		Steps:  int32(opts.Steps),
-	}
-	if opts.Seed != 0 {
-		req.Options = map[string]any{
+
+		// options
+		Options: map[string]any{
 			"seed": opts.Seed,
-		}
+		},
 	}
 
 	// Show loading spinner until generation starts
@@ -748,9 +754,6 @@ func doImageGeneration(
 			} else if strings.HasPrefix(resp.Response, "IMAGE_BASE64:") { // NOTE: for backward compatibility
 				imageBase64 = resp.Response[13:]
 			}
-
-			// FIXME: print generated image's seed value
-			// output.printColored(color.FgGreen, "Seed of generated image: %s\n", resp.Seed)
 		}
 
 		return nil
@@ -762,6 +765,9 @@ func doImageGeneration(
 	}
 
 	if imageBase64 != "" {
+		// print generated image's seed value
+		output.printColored(color.FgGreen, "Seed of generated image: %d\n", opts.Seed)
+
 		// Decode base64 data,
 		imageData, err := base64.StdEncoding.DecodeString(imageBase64)
 		if err != nil {
