@@ -13,6 +13,9 @@ Build `ollama` with mlx tag (for image generation on macOS) and run it:
 ```bash
 $ git clone https://github.com/ollama/ollama.git
 $ cd ollama/
+# $ xcode-select --install
+# $ xcodebuild -downloadComponent MetalToolchain
+# $ brew install cmake
 $ cmake --preset MLX
 $ cmake --build --preset MLX --parallel
 $ cmake --install build --component MLX
