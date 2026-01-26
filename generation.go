@@ -23,6 +23,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/progress"
+	omodel "github.com/ollama/ollama/types/model"
 	"github.com/ollama/ollama/x/imagegen"
 )
 
@@ -46,6 +47,11 @@ const (
 	defaultImageGenerationSteps  int = 9
 	defaultImageGenerationWidth  int = 1024
 	defaultImageGenerationHeight int = 1024
+)
+
+const (
+	thinkingTagBegin = `<think>`
+	thinkingTagEnd   = `</think>`
 )
 
 // newOllamaClient returns a newly created ollama api client.
@@ -102,6 +108,25 @@ func doGeneration(
 	client, err := newOllamaClient()
 	if err != nil {
 		return 1, fmt.Errorf("failed to initialize Ollama API client: %w", err)
+	}
+
+	// get model info and check values
+	var shown *api.ShowResponse
+	shown, err = client.Show(ctx, &api.ShowRequest{
+		Model: model,
+	})
+	if err != nil {
+		return 1, fmt.Errorf("failed to get model(%s) info: %w", model, err)
+	}
+	// (thinking)
+	var thinkVal any
+	if slices.Contains(shown.Capabilities, omodel.CapabilityThinking) {
+		thinkVal = withThinking
+	} else {
+		if withThinking {
+			output.warn("model(%s) does not support thinking, so disabling it...", model)
+		}
+		thinkVal = false
 	}
 
 	filesInPrompt := map[string][]byte{}
@@ -215,7 +240,7 @@ func doGeneration(
 	}
 	// (thinking)
 	req.Think = &api.ThinkValue{
-		Value: withThinking,
+		Value: thinkVal,
 	}
 
 	// (history)
@@ -250,11 +275,11 @@ func doGeneration(
 								// print generated content
 								output.printColored(
 									color.FgHiGreen,
-									"<think>\n",
+									thinkingTagBegin+"\n",
 								)
 								pastGenerations = appendModelResponseToPastGenerations(
 									pastGenerations,
-									"<think>\n",
+									thinkingTagBegin+"\n",
 								)
 							}
 
@@ -263,14 +288,16 @@ func doGeneration(
 					} else {
 						if reasoningStarted {
 							if !hideReasoning {
+								output.makeSureToEndWithNewLine()
+
 								// print generated content
 								output.printColored(
 									color.FgHiGreen,
-									"</think>\n",
+									thinkingTagEnd+"\n",
 								)
 								pastGenerations = appendModelResponseToPastGenerations(
 									pastGenerations,
-									"</think>\n",
+									thinkingTagEnd+"\n",
 								)
 							}
 
@@ -659,6 +686,19 @@ func doImageGeneration(
 		return 1, fmt.Errorf("failed to initialize Ollama API client: %w", err)
 	}
 
+	// get model info and check values
+	var shown *api.ShowResponse
+	shown, err = client.Show(ctx, &api.ShowRequest{
+		Model: model,
+	})
+	if err != nil {
+		return 1, fmt.Errorf("failed to get model(%s) info: %w", model, err)
+	}
+	// (image)
+	if !slices.Contains(shown.Capabilities, omodel.CapabilityImage) {
+		return 1, fmt.Errorf("model(%s) does not support image generation/edit", model)
+	}
+
 	// default values
 	if width == nil {
 		width = ptr(defaultImageGenerationWidth)
@@ -889,6 +929,34 @@ func doEmbeddingsGeneration(
 		"generating embeddings...",
 	)
 
+	ctx, cancel := context.WithTimeout(
+		ctx,
+		time.Duration(conf.TimeoutSeconds)*time.Second,
+	)
+	defer cancel()
+
+	// ollama api client
+	client, err := newOllamaClient()
+	if err != nil {
+		return 1, fmt.Errorf("failed to initialize Ollama API client: %w", err)
+	}
+
+	model := *p.Model
+
+	// get model info and check values
+	var shown *api.ShowResponse
+	shown, err = client.Show(ctx, &api.ShowRequest{
+		Model: model,
+	})
+	if err != nil {
+		return 1, fmt.Errorf("failed to get model(%s) info: %w", model, err)
+	}
+	// (embedding)
+	if !slices.Contains(shown.Capabilities, omodel.CapabilityEmbedding) {
+		return 1, fmt.Errorf("model(%s) does not support embedding", model)
+	}
+
+	// chunk options
 	if p.Embeddings.EmbeddingsChunkSize == nil {
 		p.Embeddings.EmbeddingsChunkSize = ptr(defaultEmbeddingsChunkSize)
 	}
@@ -904,18 +972,6 @@ func doEmbeddingsGeneration(
 	})
 	if err != nil {
 		return 1, fmt.Errorf("failed to chunk text: %w", err)
-	}
-
-	ctx, cancel := context.WithTimeout(
-		ctx,
-		time.Duration(conf.TimeoutSeconds)*time.Second,
-	)
-	defer cancel()
-
-	// ollama api client
-	client, err := newOllamaClient()
-	if err != nil {
-		return 1, fmt.Errorf("failed to initialize Ollama API client: %w", err)
 	}
 
 	options := map[string]any{}
@@ -938,7 +994,7 @@ func doEmbeddingsGeneration(
 	}
 	for i, text := range chunks.Chunks {
 		embeddings, err := client.Embeddings(ctx, &api.EmbeddingRequest{
-			Model:   *p.Model,
+			Model:   model,
 			Prompt:  text,
 			Options: options,
 		})

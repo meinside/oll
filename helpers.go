@@ -35,8 +35,8 @@ const (
 	urlRegexp       = `https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)`
 	urlToTextFormat = "<link url=\"%[1]s\" content-type=\"%[2]s\">\n%[3]s\n</link>"
 
-	filesTagBegin = "<files>"
-	filesTagEnd   = "</files>"
+	filesTagBegin = `<files>`
+	filesTagEnd   = `</files>`
 )
 
 // file/directory names to ignore while recursing directories
