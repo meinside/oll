@@ -919,6 +919,20 @@ type SearchResult struct {
 
 const defaultSearchParamQuery = `query`
 
+// get OLLAMA_API_KEY from config or environment variable
+func ollamaAPIKey(conf config, output *outputWriter) (ollamaAPIKey string) {
+	if conf.OllamaAPIKey != nil {
+		ollamaAPIKey = *conf.OllamaAPIKey
+	}
+	if fromEnv := os.Getenv("OLLAMA_API_KEY"); len(fromEnv) > 0 {
+		if ollamaAPIKey != "" {
+			output.warn("overriding OLLAMA_API_KEY from environment variable")
+		}
+		ollamaAPIKey = fromEnv
+	}
+	return ollamaAPIKey
+}
+
 // webSearch searches for `query` on the web using the specified Ollama web search API.
 //
 // https://ollama.com/blog/web-search

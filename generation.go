@@ -23,7 +23,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/progress"
-	omodel "github.com/ollama/ollama/types/model"
+	mdl "github.com/ollama/ollama/types/model"
 	"github.com/ollama/ollama/x/imagegen"
 )
 
@@ -120,7 +120,7 @@ func doGeneration(
 	}
 	// (thinking)
 	var thinkVal any
-	if slices.Contains(shown.Capabilities, omodel.CapabilityThinking) {
+	if slices.Contains(shown.Capabilities, mdl.CapabilityThinking) {
 		thinkVal = withThinking
 	} else {
 		if withThinking {
@@ -572,17 +572,31 @@ func doGeneration(
 					output.makeSureToEndWithNewLine()
 
 					// print the number of tokens
-					output.verbose(
-						verboseMinimum,
-						vbs,
-						"%s done[%s], load: %v, total: %v, prompt eval: %.3f/s, eval: %3f/s",
-						model,
-						resp.DoneReason,
-						resp.LoadDuration,
-						resp.TotalDuration,
-						float64(resp.PromptEvalCount)/resp.PromptEvalDuration.Seconds(),
-						float64(resp.EvalCount)/resp.EvalDuration.Seconds(),
-					)
+					promptEvalDuration := resp.PromptEvalDuration.Seconds()
+					evalDuration := resp.EvalDuration.Seconds()
+					if promptEvalDuration > 0 && evalDuration > 0 {
+						output.verbose(
+							verboseMinimum,
+							vbs,
+							"%s done[%s], load: %v, total: %v, prompt eval: %.3f/s, eval: %3f/s",
+							model,
+							resp.DoneReason,
+							resp.LoadDuration,
+							resp.TotalDuration,
+							float64(resp.PromptEvalCount)/promptEvalDuration,
+							float64(resp.EvalCount)/evalDuration,
+						)
+					} else {
+						output.verbose(
+							verboseMinimum,
+							vbs,
+							"%s done[%s], load: %v, total: %v",
+							model,
+							resp.DoneReason,
+							resp.LoadDuration,
+							resp.TotalDuration,
+						)
+					}
 
 					// success
 					ch <- result{
@@ -695,7 +709,7 @@ func doImageGeneration(
 		return 1, fmt.Errorf("failed to get model(%s) info: %w", model, err)
 	}
 	// (image)
-	if !slices.Contains(shown.Capabilities, omodel.CapabilityImage) {
+	if !slices.Contains(shown.Capabilities, mdl.CapabilityImage) {
 		return 1, fmt.Errorf("model(%s) does not support image generation/edit", model)
 	}
 
@@ -952,7 +966,7 @@ func doEmbeddingsGeneration(
 		return 1, fmt.Errorf("failed to get model(%s) info: %w", model, err)
 	}
 	// (embedding)
-	if !slices.Contains(shown.Capabilities, omodel.CapabilityEmbedding) {
+	if !slices.Contains(shown.Capabilities, mdl.CapabilityEmbedding) {
 		return 1, fmt.Errorf("model(%s) does not support embedding", model)
 	}
 
@@ -1084,13 +1098,7 @@ func checkCallbackPath(
 
 		// search from web with https://ollama.com/blog/web-search
 		fnCallback = func() (string, error) {
-			var ollamaAPIKey string
-			if conf.OllamaAPIKey != nil {
-				ollamaAPIKey = *conf.OllamaAPIKey
-			}
-			if fromEnv := os.Getenv("OLLAMA_API_KEY"); len(fromEnv) > 0 {
-				ollamaAPIKey = fromEnv
-			}
+			ollamaAPIKey := ollamaAPIKey(conf, output)
 
 			searchParamQuery := defaultSearchParamQuery
 			if title, exists := strings.CutPrefix(callbackPath, fnCallbackWebSearch+"="); exists {
@@ -1114,7 +1122,7 @@ func checkCallbackPath(
 					return "", fmt.Errorf("missing `%s` from function arguments: %s", searchParamQuery, prettify(fnCall.Arguments, true))
 				}
 			} else {
-				return "", fmt.Errorf("missing `OLLAMA_API_KEY` environment variable and/or `ollama_api_key` config field")
+				return "", fmt.Errorf("missing `OLLAMA_API_KEY` environment variable and/or `ollama_api_key` field in the config file")
 			}
 		}
 	} else { // ordinary path of binary/script:
