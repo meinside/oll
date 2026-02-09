@@ -13,7 +13,7 @@ require (
 	github.com/jwalton/go-supportscolor v1.2.0
 	github.com/meinside/version-go v0.0.3
 	github.com/modelcontextprotocol/go-sdk v1.2.0
-	github.com/ollama/ollama v0.15.4
+	github.com/ollama/ollama v0.15.6
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	mvdan.cc/sh v2.6.4+incompatible
 )
@@ -22,8 +22,7 @@ require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/clipperhouse/stringish v0.1.1 // indirect
-	github.com/clipperhouse/uax29/v2 v2.5.0 // indirect
+	github.com/clipperhouse/uax29/v2 v2.6.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/emirpasic/gods/v2 v2.0.0-alpha // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -40,9 +39,9 @@ require (
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/image v0.35.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
