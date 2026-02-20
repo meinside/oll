@@ -55,8 +55,8 @@ github.com/meinside/version-go v0.0.3 h1:GXSwi6sTmgpnSR09jAAqDGWeX2Nq52fe5xpitgA
 github.com/meinside/version-go v0.0.3/go.mod h1:mFvlwbro1E126u4rU727CcHNa8OPFyhq+KDYYNysFj4=
 github.com/modelcontextprotocol/go-sdk v1.3.1 h1:TfqtNKOIWN4Z1oqmPAiWDC2Jq7K9OdJaooe0teoXASI=
 github.com/modelcontextprotocol/go-sdk v1.3.1/go.mod h1:DgVX498dMD8UJlseK1S5i1T4tFz2fkBk4xogC3D15nw=
-github.com/ollama/ollama v0.16.2 h1:iZ/vV7t9QRU0MXfwWXl0+6HBb2xUULubksqK0dfB+og=
-github.com/ollama/ollama v0.16.2/go.mod h1:FEk95NbAJJZk+t7cLh+bPGTul72j1O3PLLlYNV3FVZ0=
+github.com/ollama/ollama v0.16.3 h1:gdG0Mf8Aj41wSqX3i5NunoWeN3V2CNwnkupRPM2OnEE=
+github.com/ollama/ollama v0.16.3/go.mod h1:tCX4IMV8DHjl3zY0THxuEkpWDZSOchJpzTuLACpMwFw=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
