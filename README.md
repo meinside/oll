@@ -108,8 +108,8 @@ $ curl https://api.coincap.io/v2/assets \
 You can generate with thinking with [models which support thinking](https://ollama.com/search?c=thinking):
 
 ```bash
-$ oll -m "qwen3:8b" -p "what is the earth escape velocity?" --with-thinking
-$ oll -m "qwen3:8b" -p "what are the three laws of newton?" --with-thinking --hide-reasoning
+$ oll -m "qwen3.5:9b" -p "what is the earth escape velocity?" --with-thinking
+$ oll -m "qwen3.5:9b" -p "what are the three laws of newton?" --with-thinking --hide-reasoning
 ```
 
 You can generate images with image generation models:
@@ -535,7 +535,7 @@ You can use [vision models](https://ollama.com/search?c=vision) with `-m` or `--
 
 ```bash
 # generate with a multimodal model and image file(s)
-$ oll -m qwen3-vl:8b \
+$ oll -m qwen3.5:9b \
     -p "what is this picture?" \
     -f ~/Downloads/some_image.png
 ```
