@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	// https://ollama.com/library/qwen3-vl
-	defaultModel = `qwen3-vl:8b` // NOTE: picked a model which supports vision, tooling, and thinking (just for convenience)
+	// https://ollama.com/library/qwen3.5
+	defaultModel = `qwen3.5:9b` // NOTE: picked a model which supports vision, tooling, and thinking (just for convenience)
 
 	// https://ollama.com/x/flux2-klein
 	defaultModelForImageGeneration = `x/flux2-klein:4b` // NOTE: picked an image generation model which support editing
