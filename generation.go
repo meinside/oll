@@ -24,8 +24,31 @@ import (
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/progress"
 	mdl "github.com/ollama/ollama/types/model"
-	"github.com/ollama/ollama/x/imagegen"
 )
+
+// imageGenOptions is a local copy of imagegen.ImageGenOptions.
+//
+// The original struct is defined in github.com/ollama/ollama/x/imagegen,
+// but that package transitively depends on llama/llama.cpp CGo code which
+// requires C/C++ headers (nlohmann, miniaudio, stb) shipped under
+// llama/llama.cpp/vendor/. The Go module spec unconditionally strips
+// directories named "vendor" from module zips (see https://go.dev/ref/mod#zip-files),
+// so those headers are always missing when ollama is used as a Go dependency,
+// causing the build to fail. Additionally, the ollama maintainers have stated
+// that the project is not intended to be used as a library (see
+// https://github.com/ollama/ollama/issues/505).
+//
+// Since only this plain struct is needed, we define it locally to avoid
+// pulling in the problematic dependency chain.
+//
+// ref: https://github.com/ollama/ollama/blob/main/x/imagegen/cli.go
+type imageGenOptions struct {
+	Width          int
+	Height         int
+	Steps          int
+	Seed           int
+	NegativePrompt string
+}
 
 const (
 	// https://ollama.com/library/qwen3.5
@@ -729,7 +752,7 @@ func doImageGeneration(
 		seedNum = rand.Int()
 	}
 
-	opts := imagegen.ImageGenOptions{
+	opts := imageGenOptions{
 		Width:  *width,
 		Height: *height,
 		Steps:  defaultImageGenerationSteps,
