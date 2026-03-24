@@ -6,7 +6,7 @@ require (
 	github.com/BourgeoisBear/rasterm v1.1.2
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/dustin/go-humanize v1.0.1
-	github.com/fatih/color v1.18.0
+	github.com/fatih/color v1.19.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/google/jsonschema-go v0.4.2
 	github.com/jessevdk/go-flags v1.6.1
@@ -21,7 +21,7 @@ require (
 require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
-	github.com/buger/jsonparser v1.1.1 // indirect
+	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mailru/easyjson v0.9.2 // indirect
