@@ -13,7 +13,7 @@ require (
 	github.com/jwalton/go-supportscolor v1.2.0
 	github.com/meinside/version-go v0.0.3
 	github.com/modelcontextprotocol/go-sdk v1.4.1
-	github.com/ollama/ollama v0.18.2
+	github.com/ollama/ollama v0.19.0
 	github.com/tailscale/hujson v0.0.0-20260302212456-ecc657c15afd
 	mvdan.cc/sh v2.6.4+incompatible
 )
