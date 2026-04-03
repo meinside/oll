@@ -476,12 +476,15 @@ func uniqPtrs[T comparable](slice []*T) []*T {
 }
 
 // convertPromptAndFiles converts given prompt & files for generation.
+//
+// Media files (images and audio) are returned as binary data for the API's Images field.
+// Text files are embedded directly into the prompt.
 func convertPromptAndFiles(
 	prompt string,
 	filesInPrompt map[string][]byte,
 	filepaths []*string,
-) (convertedPrompt string, images []api.ImageData, err error) {
-	images = []api.ImageData{}
+) (convertedPrompt string, mediaData []api.ImageData, err error) {
+	mediaData = []api.ImageData{}
 
 	type f struct {
 		data     []byte
@@ -491,7 +494,9 @@ func convertPromptAndFiles(
 
 	for url, file := range filesInPrompt {
 		if isImage, _ := supportedImage(file); isImage {
-			images = append(images, api.ImageData(file))
+			mediaData = append(mediaData, api.ImageData(file))
+		} else if isAudio, _ := supportedAudio(file); isAudio {
+			mediaData = append(mediaData, api.ImageData(file))
 		} else {
 			files[url] = f{
 				mimeType: mimetype.Detect(file).String(),
@@ -506,7 +511,9 @@ func convertPromptAndFiles(
 			fbase := filepath.Base(*fp)
 			if bytes, err := io.ReadAll(opened); err == nil {
 				if isImage, _ := supportedImagePath(*fp); isImage {
-					images = append(images, api.ImageData(bytes))
+					mediaData = append(mediaData, api.ImageData(bytes))
+				} else if isAudio, _ := supportedAudioPath(*fp); isAudio {
+					mediaData = append(mediaData, api.ImageData(bytes))
 				} else {
 					files[fbase] = f{
 						mimeType: mimetype.Detect(bytes).String(),
@@ -539,7 +546,7 @@ func convertPromptAndFiles(
 		contexts = append(contexts, filesTagEnd+"\n\n")
 	}
 
-	return fmt.Sprintf("%s%s", strings.Join(contexts, "\n"), prompt), images, nil
+	return fmt.Sprintf("%s%s", strings.Join(contexts, "\n"), prompt), mediaData, nil
 }
 
 // supportedImage checks if given image data is supported or not.
@@ -565,6 +572,35 @@ func supportedImagePath(filepath string) (supported bool, err error) {
 			mimeTypeString := mimeType.String()
 
 			return (mimeTypeString == "image/png" || mimeTypeString == "image/jpeg"), nil
+		}
+	}
+
+	return false, err
+}
+
+// supportedAudio checks if given audio data is supported or not.
+func supportedAudio(data []byte) (supported bool, err error) {
+	var mimeType *mimetype.MIME
+	if mimeType, err = mimetype.DetectReader(bytes.NewReader(data)); err == nil {
+		mimeTypeString := mimeType.String()
+
+		return (mimeTypeString == "audio/wav" || mimeTypeString == "audio/x-wav"), nil
+	}
+
+	return false, err
+}
+
+// supportedAudioPath detects and returns whether given path is an audio or not.
+func supportedAudioPath(filepath string) (supported bool, err error) {
+	var f *os.File
+	if f, err = os.Open(filepath); err == nil {
+		defer func() { _ = f.Close() }()
+
+		var mimeType *mimetype.MIME
+		if mimeType, err = mimetype.DetectReader(f); err == nil {
+			mimeTypeString := mimeType.String()
+
+			return (mimeTypeString == "audio/wav" || mimeTypeString == "audio/x-wav"), nil
 		}
 	}
 
@@ -616,11 +652,12 @@ func checkMimeType(mimeType *mimetype.MIME) (matched string, supported bool) {
 			//"image/heic",
 			//"image/heif",
 
-			// audios
+			// audios (gemma4, wav only)
 			//
 			// https://ai.google.dev/gemini-api/docs/audio?lang=go#supported-formats
-			//"audio/wav",
+			"audio/wav",
 			//"audio/mp3",
+			//"audio/mpeg",
 			//"audio/aiff",
 			//"audio/aac",
 			//"audio/ogg",

@@ -540,6 +540,15 @@ $ oll -m qwen3.5:9b \
     -f ~/Downloads/some_image.png
 ```
 
+Audio files (`.wav` only) are also supported with models that have audio capabilities (e.g. [gemma4](https://ollama.com/library/gemma4)):
+
+```bash
+# generate with an audio file
+$ oll -m gemma4:e4b \
+    -p "transcribe this audio" \
+    -f ~/Downloads/recording.wav
+```
+
 ### Generating Embeddings
 
 You can print [embeddings](https://ollama.com/search?c=embedding) of a given prompt in JSON format.
