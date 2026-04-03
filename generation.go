@@ -171,7 +171,7 @@ func doGeneration(
 	}
 
 	// convert prompt with/without files
-	prompt, imageFiles, err := convertPromptAndFiles(
+	prompt, mediaFiles, err := convertPromptAndFiles(
 		prompt,
 		filesInPrompt,
 		filepaths,
@@ -179,9 +179,9 @@ func doGeneration(
 	if err != nil {
 		return 1, fmt.Errorf("failed to convert prompt and files: %w", err)
 	}
-	var images []api.ImageData = nil
-	for _, img := range imageFiles {
-		images = append(images, api.ImageData(img))
+	var media []api.ImageData = nil
+	for _, mf := range mediaFiles {
+		media = append(media, api.ImageData(mf))
 	}
 
 	// FIXME: TODO: return error when the context length is exceeded
@@ -189,9 +189,9 @@ func doGeneration(
 	output.verbose(
 		verboseMaximum,
 		vbs,
-		"with converted prompt: '%s' and image files: %v",
+		"with converted prompt: '%s' and media files: %v",
 		strings.TrimSpace(prompt),
-		imageFiles,
+		mediaFiles,
 	)
 
 	// generation options
@@ -205,7 +205,7 @@ func doGeneration(
 			{
 				Role:    "user",
 				Content: prompt,
-				Images:  images,
+				Images:  media,
 			},
 		},
 	}
@@ -763,7 +763,7 @@ func doImageGeneration(
 	}
 
 	// convert prompt with/without files
-	prompt, imageFiles, err := convertPromptAndFiles(
+	prompt, mediaFiles, err := convertPromptAndFiles(
 		prompt,
 		nil,
 		filepaths,
@@ -771,16 +771,16 @@ func doImageGeneration(
 	if err != nil {
 		return 1, fmt.Errorf("failed to convert prompt and files: %w", err)
 	}
-	var images []api.ImageData = nil
-	if len(imageFiles) > 0 {
-		images = append(images, imageFiles...)
+	var media []api.ImageData = nil
+	if len(mediaFiles) > 0 {
+		media = append(media, mediaFiles...)
 	}
 
 	// Build request with image gen options encoded in Options fields
 	req := &api.GenerateRequest{
 		Model:  model,
 		Prompt: prompt,
-		Images: images,
+		Images: media,
 		KeepAlive: &api.Duration{
 			Duration: time.Duration(conf.ImageGenerationTimeoutSeconds) * time.Second,
 		},
