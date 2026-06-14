@@ -13,7 +13,7 @@ require (
 	github.com/jwalton/go-supportscolor v1.2.0
 	github.com/meinside/version-go v0.0.3
 	github.com/modelcontextprotocol/go-sdk v1.6.1
-	github.com/ollama/ollama v0.30.6
+	github.com/ollama/ollama v0.30.8
 	github.com/tailscale/hujson v0.0.0-20260302212456-ecc657c15afd
 	mvdan.cc/sh v2.6.4+incompatible
 )
@@ -31,10 +31,10 @@ require (
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	golang.org/x/crypto v0.52.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/term v0.43.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/term v0.44.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
