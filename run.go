@@ -246,6 +246,42 @@ func run(
 				}
 			}
 
+			// attach self as an in-memory MCP tool
+			if p.MCPTools.WithSelfAsStdioCommand {
+				output.verbose(
+					verboseMedium,
+					p.Verbose,
+					"attaching self as an in-memory MCP tool...",
+				)
+
+				selfConn, selfTools, err := selfAsMCPTool(context.TODO(), conf, p, output)
+				if err != nil {
+					return 1, fmt.Errorf("failed to run self as a local MCP tool: %w", err)
+				}
+				if allMCPTools == nil {
+					allMCPTools = mcpConnectionsAndTools{}
+				}
+				allMCPTools[mcpToolNameSelf] = struct {
+					serverType mcpServerType
+					connection *mcp.ClientSession
+					tools      []*mcp.Tool
+				}{
+					serverType: mcpServerInMemory,
+					connection: selfConn,
+					tools:      selfTools,
+				}
+
+				// check if there is any duplicated name of function
+				if value, duplicated := duplicated(
+					keysFromTools(localTools, allMCPTools),
+				); duplicated {
+					return 1, fmt.Errorf(
+						"duplicated function name in tools: '%s'",
+						value,
+					)
+				}
+			}
+
 			// close all MCP connections
 			defer func() {
 				for _, connsAndTools := range allMCPTools {
@@ -324,7 +360,8 @@ func defaultSystemInstruction(p params) string {
 	datetime := time.Now().Format("2006-01-02 15:04:05 MST (Mon)")
 	hostname, _ := os.Hostname()
 
-	return fmt.Sprintf(defaultSystemInstructionFormat,
+	return fmt.Sprintf(
+		defaultSystemInstructionFormat,
 		appName,
 		*p.Model,
 		datetime,
