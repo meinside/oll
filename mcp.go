@@ -29,6 +29,7 @@ type mcpServerType string
 const (
 	mcpServerStreamable mcpServerType = "streamable"
 	mcpServerStdio      mcpServerType = "stdio"
+	mcpServerInMemory   mcpServerType = "in-memory"
 )
 
 // a map of MCP connections and tools
@@ -85,7 +86,7 @@ func fetchMCPTools(
 
 // mcpToOllamaTools converts given MCP tools `from` to Ollama tools.
 //
-// InputSchema value of each mcp.Tool should be in type: `jsonschema.Schema` or `map[string]any`.
+// InputSchema value of each mcp.Tool should be in type: `jsonschema.Schema`, `*jsonschema.Schema`, or `map[string]any`.
 func mcpToOllamaTools(
 	from []*mcp.Tool,
 ) (to []*api.Tool, err error) {
@@ -99,21 +100,33 @@ func mcpToOllamaTools(
 				Description: f.Description,
 			},
 		}
-		if inputSchema, ok := f.InputSchema.(jsonschema.Schema); ok {
-			if marshalled, err := inputSchema.MarshalJSON(); err == nil {
-				var schema map[string]any
-				if err := json.Unmarshal(marshalled, &schema); err == nil {
-					to[i].Items = schema
-				} else {
-					return nil, fmt.Errorf("could not convert json to map: %w", err)
-				}
-			} else {
+
+		// marshal the input schema to JSON
+		var marshalled []byte
+		switch inputSchema := f.InputSchema.(type) {
+		case *jsonschema.Schema:
+			if inputSchema == nil {
+				return nil, fmt.Errorf("tools[%d].InputSchema is a nil `*jsonschema.Schema`", i)
+			}
+			if marshalled, err = inputSchema.MarshalJSON(); err != nil {
 				return nil, fmt.Errorf("could not convert input schema to json: %w", err)
 			}
-		} else if inputSchema, ok := f.InputSchema.(map[string]any); ok {
-			to[i].Items = inputSchema
-		} else {
-			return nil, fmt.Errorf("tools[%d].InputSchema is not in type `jsonschema.Schema` or `map[string]any`: %T", i, f.InputSchema)
+		case jsonschema.Schema:
+			if marshalled, err = inputSchema.MarshalJSON(); err != nil {
+				return nil, fmt.Errorf("could not convert input schema to json: %w", err)
+			}
+		case map[string]any:
+			if marshalled, err = json.Marshal(inputSchema); err != nil {
+				return nil, fmt.Errorf("could not convert input schema to json: %w", err)
+			}
+		default:
+			return nil, fmt.Errorf("tools[%d].InputSchema is not in type `jsonschema.Schema`, `*jsonschema.Schema`, or `map[string]any`: %T", i, f.InputSchema)
+		}
+
+		// unmarshal the schema into the function's parameters so the model
+		// receives the tool's properties/required fields
+		if err = json.Unmarshal(marshalled, &to[i].Function.Parameters); err != nil {
+			return nil, fmt.Errorf("could not convert input schema to function parameters: %w", err)
 		}
 	}
 
@@ -198,6 +211,41 @@ func mcpRun(
 		&mcp.CommandTransport{
 			Command: exec.Command(command, args...),
 		},
+		&mcp.ClientSessionOptions{},
+	); err == nil {
+		return connection, nil
+	}
+
+	return nil, err
+}
+
+// mcpRunInMemory connects to a local (in-memory) MCP server, starts, initializes,
+// and returns the client.
+func mcpRunInMemory(
+	ctx context.Context,
+	server *mcp.Server,
+) (connection *mcp.ClientSession, err error) {
+	clientTransport, serverTransport := mcp.NewInMemoryTransports()
+
+	// run server,
+	if _, err = server.Connect(
+		ctx,
+		serverTransport,
+		&mcp.ServerSessionOptions{},
+	); err != nil {
+		return nil, fmt.Errorf("failed to connect to in-memory MCP server: %w", err)
+	}
+
+	// connect to server,
+	if connection, err = mcp.NewClient(
+		&mcp.Implementation{
+			Name:    mcpClientName,
+			Version: version.Build(version.OS | version.Architecture),
+		},
+		&mcp.ClientOptions{},
+	).Connect(
+		ctx,
+		clientTransport,
 		&mcp.ClientSessionOptions{},
 	); err == nil {
 		return connection, nil

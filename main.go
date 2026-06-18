@@ -16,13 +16,6 @@ const (
 
 // main
 func main() {
-	// read from standard input, if any
-	var stdin []byte
-	stat, _ := os.Stdin.Stat()
-	if (stat.Mode() & os.ModeCharDevice) == 0 {
-		stdin, _ = io.ReadAll(os.Stdin)
-	}
-
 	// output writer (stdout/stderr)
 	output := newOutputWriter()
 
@@ -30,6 +23,34 @@ func main() {
 	var p params
 	parser := flags.NewParser(&p, flags.HelpFlag|flags.PassDoubleDash)
 	if remaining, err := parser.Parse(); err == nil {
+		// check if multiple tasks were requested at a time
+		if p.multipleTaskRequested() {
+			output.error("Input error: multiple tasks were requested at a time.")
+
+			os.Exit(output.printHelpBeforeExit(1, parser))
+		}
+
+		// check if there was any parameter without flag
+		if len(remaining) > 0 {
+			output.error("Input error: parameters without flags: %s", strings.Join(remaining, " "))
+
+			os.Exit(output.printHelpBeforeExit(1, parser))
+		}
+
+		if p.MCPTools.RunAsStandaloneStdioServer { // run as a standalone STDIO MCP server
+			exit, err := serve(output, p)
+			if err != nil {
+				os.Exit(output.printErrorBeforeExit(exit, "Error: %s", err))
+			}
+			os.Exit(exit)
+		}
+
+		// read from standard input, if any
+		var stdin []byte
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) == 0 {
+			stdin, _ = io.ReadAll(os.Stdin)
+		}
 		if len(stdin) > 0 {
 			if p.Generation.Prompt == nil {
 				p.Generation.Prompt = ptr(string(stdin))
@@ -45,20 +66,6 @@ func main() {
 					merged,
 				)
 			}
-		}
-
-		// check if multiple tasks were requested at a time
-		if p.multipleTaskRequested() {
-			output.error("Input error: multiple tasks were requested at a time.")
-
-			os.Exit(output.printHelpBeforeExit(1, parser))
-		}
-
-		// check if there was any parameter without flag
-		if len(remaining) > 0 {
-			output.error("Input error: parameters without flags: %s", strings.Join(remaining, " "))
-
-			os.Exit(output.printHelpBeforeExit(1, parser))
 		}
 
 		// run with params

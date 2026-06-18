@@ -513,6 +513,48 @@ $ oll -m "mistral-small3.2:24b" \
     --mcp-stdio-command="~/tmp/some-mcp-servers/hello --stdio --title 'hello world'"
 ```
 
+#### oll as an MCP Tool (Self)
+
+Run with `-S` or `--mcp-tool-self` to add `oll` itself as an in-memory MCP tool during a normal run. It exposes the following tools:
+
+* Generation:
+    * `oll_list_models`: lists locally installed Ollama models, and
+    * `oll_generate`: generates text or an image (saved to a local file) from a prompt.
+* Paths & environment:
+    * `oll_get_cwd`: returns the current working directory,
+    * `oll_list_envvar_names`: lists the names of environment variables, and
+    * `oll_get_envvar`: returns the value of an environment variable.
+* Files:
+    * `oll_stat_file`: returns metadata of a file or directory,
+    * `oll_get_mimetype`: returns the mime type of a file,
+    * `oll_list_files`: lists the contents of a directory,
+    * `oll_read_text_file`: reads a plain text file,
+    * `oll_create_text_file`: creates a new plain text file,
+    * `oll_delete_file`: deletes a file, and
+    * `oll_move_file`: moves or renames a file.
+* Execution & network:
+    * `oll_run_cmdline`: runs a bash commandline and returns its output, and
+    * `oll_do_http`: sends an HTTP request and returns the response.
+
+```bash
+$ oll -m "qwen3.5:9b" \
+    -S \
+    -p "list my local ollama models, then summarize what they are good for"
+```
+
+Tools that read/write files, the environment, run commands, or send HTTP requests are marked as destructive, so `oll` asks for confirmation before calling them. Use `--force-call-destructive-tools` to skip the confirmation.
+
+#### oll as a Standalone STDIO MCP Server
+
+Run with `-M` or `--mcp-server-self` to run `oll` as a standalone STDIO MCP server exposing the same set of tools. This lets another `oll` (or any MCP client) use it as a local STDIO server:
+
+```bash
+# use this oll instance as a STDIO MCP server from another oll
+$ oll -m "mistral-small3.2:24b" \
+    -p "generate an image of a cat and tell me where it was saved" \
+    --mcp-stdio-command="oll -M"
+```
+
 ### Fetch URL Contents from the Prompt
 
 Run with `-x` or `--convert-urls` parameter, then it will try fetching contents from all URLs in the given prompt.
