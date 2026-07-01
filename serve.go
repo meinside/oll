@@ -715,13 +715,11 @@ func buildSelfServer(
 			if err != nil || cmdline == nil {
 				return mcpErrorResult("Failed to get required argument 'cmdline': %s", err)
 			}
-			command, cmdArgs, err := parseCommandline(*cmdline)
-			if err != nil {
-				return mcpErrorResult("Failed to parse 'cmdline': %s", err)
-			}
 			cmdCtx, cancel := context.WithTimeout(ctx, commandTimeoutSeconds*time.Second)
 			defer cancel()
-			stdout, stderr, exit, runErr := runCommandWithContext(cmdCtx, command, cmdArgs...)
+			// execute cmdline through a shell, so pipes, redirections,
+			// logical operators, variable expansion, etc. work as expected
+			stdout, stderr, exit, runErr := runShellCommandWithContext(cmdCtx, *cmdline)
 			marshalled, mErr := json.Marshal(struct {
 				Cmdline  string `json:"cmdline"`
 				ExitCode int    `json:"exitCode"`
@@ -1270,13 +1268,19 @@ func dirEntriesToJSON(entries []os.DirEntry, parentDirpath string) string {
 	return fmt.Sprintf("%+v", result)
 }
 
-// runCommandWithContext runs the given command + args with context.
-func runCommandWithContext(
+// runShellCommandWithContext runs the given commandline through a shell with
+// context, so that shell features (pipes, redirections, logical operators,
+// variable expansion, globbing, etc.) work as expected.
+func runShellCommandWithContext(
 	ctx context.Context,
-	command string,
-	args ...string,
+	cmdline string,
 ) (stdout, stderr string, exitCode int, err error) {
-	cmd := exec.CommandContext(ctx, command, args...)
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
+	}
+
+	cmd := exec.CommandContext(ctx, shell, "-c", cmdline)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.Stdout = &stdoutBuf
